@@ -3,9 +3,11 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: #000;
-  overflow: hidden;
-  position: fixed;
+  background-color: #000;
+  overflow: hidden; /* Verhindert Wackeln/Scrollen */
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #app {
@@ -17,12 +19,16 @@ body, html {
 }
 
 canvas {
-  /* Zwingt das Canvas, so groß wie möglich zu werden */
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100vw;
+  /* Das zwingt das Spiel auf die volle Breite des iPhones */
+  width: 100vw !important;
+  height: auto !important; 
+  
+  /* Falls das Handy sehr lang ist, sorgt das hier dafür, dass es nicht oben/unten rausragt */
   max-height: 100vh;
-  /* 'contain' zeigt das ganze Brett, 'cover' würde ränder abschneiden */
-  object-fit: contain; 
+  
+  object-fit: contain;
   display: block;
+  
+  /* Verhindert den grauen Kasten beim Klicken auf iOS */
+  -webkit-tap-highlight-color: transparent;
 }
