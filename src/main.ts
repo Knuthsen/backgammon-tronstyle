@@ -8,6 +8,19 @@ const ctx = canvas.getContext('2d')!;
 
 const boardImg = new Image();
 boardImg.src = '/TronBoardFAV.jpg';
+boardImg.onload = () => {
+  // 1. Setzt die interne Auflösung auf die Bildgröße
+  canvas.width = boardImg.width;
+  canvas.height = boardImg.height;
+  
+  // 2. Falls deine Steine in einer init-Funktion erstellt werden, 
+  // muss diese hier aufgerufen werden, damit die Koordinaten stimmen.
+  if (typeof initAnimCheckers === "function") {
+    initAnimCheckers();
+  }
+  
+  console.log("Board geladen:", canvas.width, "x", canvas.height);
+};
 
 // --- KONFIGURATION ---
 const GRID = {
