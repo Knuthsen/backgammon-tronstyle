@@ -7,7 +7,8 @@ const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
 const boardImg = new Image();
-boardImg.src = '/TronBoardFAV.jpg';
+// Pfad ohne / am Anfang für besseres Hosting-Handling
+boardImg.src = 'TronBoardFAV.jpg';
 
 // --- KONFIGURATION ---
 const GRID = {
@@ -59,7 +60,8 @@ const getLogXForPoint = (idx: number) => {
   return x;
 };
 
-const getLogYForPoint = (idx: number, i: number, count: number) => {
+// KORREKTUR: 'count' entfernt, um den TypeScript-Error zu beheben
+const getLogYForPoint = (idx: number, i: number) => {
   const isBottom = idx < 12;
   return isBottom ? GRID.bottomY - (i * GRID.stackOffset) : GRID.topY + (i * GRID.stackOffset);
 };
@@ -126,7 +128,7 @@ function animateCheckerMove(player: 'cyan' | 'magenta', from: number | 'bar', to
     tx = pos.x; ty = pos.y;
   } else {
     tx = getLogXForPoint(to);
-    ty = getLogYForPoint(to, Math.abs(state.board[to]), Math.abs(state.board[to]) + 1);
+    ty = getLogYForPoint(to, Math.abs(state.board[to]));
   }
   checker.pointIdx = to;
   gsap.to(checker, { x: tx, y: ty, duration: 0.55, ease: "power2.out" });
@@ -302,7 +304,6 @@ async function playAiTurn() {
 
   await delay(800);
   const r1 = Math.floor(Math.random()*6)+1, r2 = Math.floor(Math.random()*6)+1;
-  // PASCH-LOGIK WIEDER EINGEFÜGT
   state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2]; 
   animateDiceShake();
   
@@ -323,7 +324,7 @@ async function playAiTurn() {
   }
 
   state.isProcessing = false;
-  checkGameState(); // Prüft am Ende, ob noch Würfel übrig sind -> triggert "KEIN ZUG MÖGLICH"
+  checkGameState();
 }
 
 // --- RENDERING ---
@@ -365,7 +366,7 @@ function render() {
   ctx.font = "bold 15px monospace"; ctx.textAlign = "center"; ctx.shadowBlur = 10;
   ctx.fillStyle = CHECKER_CONFIG.cyan; ctx.shadowColor = CHECKER_CONFIG.cyan;
   ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
-  ctx.fillStyle = CHECKER_CONFIG.cyan; ctx.shadowColor = CHECKER_CONFIG.cyan;
+  ctx.fillStyle = CHECKER_CONFIG.magenta; ctx.shadowColor = CHECKER_CONFIG.magenta;
   ctx.fillText(getPipCount('magenta').toString(), barCenterX, boardImg.height - 225);
   ctx.restore();
 
@@ -401,7 +402,6 @@ function handleInteraction(clientX: number, clientY: number) {
 
   if (Math.abs(x - barCenterX) < 40 && state.dice.length === 0 && y > boardMid + GRID.diceYOffset && y < boardMid + GRID.diceYOffset + 150) {
     const r1 = Math.floor(Math.random()*6)+1, r2 = Math.floor(Math.random()*6)+1;
-    // PASCH-LOGIK WIEDER EINGEFÜGT
     state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2]; 
     animateDiceShake(); checkGameState(); return;
   }
@@ -439,7 +439,7 @@ function initAnimCheckers() {
     for (let i = 0; i < abs; i++) {
       animState.checkers.push({
         id: `${count > 0 ? 'c' : 'm'}_${count > 0 ? cT++ : mT++}`,
-        x: getLogXForPoint(idx), y: getLogYForPoint(idx, i, abs),
+        x: getLogXForPoint(idx), y: getLogYForPoint(idx, i),
         color: count > 0 ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta, pointIdx: idx
       });
     }
