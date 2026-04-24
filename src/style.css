@@ -4,41 +4,25 @@
   box-sizing: border-box;
 }
 
-html, body {
+body, html {
   width: 100%;
   height: 100%;
   background-color: #000;
-  /* Verhindert jegliches Scrollen, das Platz verschwenden könnte */
   overflow: hidden;
-  position: fixed;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-#app {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  position: fixed; /* Verhindert das "Wackeln" auf dem iPhone */
 }
 
 canvas {
-  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100vw !important;
-  height: 100vh !important; /* Nutzt die komplette Höhe des iPhones */
+  height: 100vh !important;
   
-  /* OPTION A: Wenn das Bild den ganzen Schirm füllen soll, 
-     auch wenn es dabei leicht verzerrt wird: */
+  /* 'fill' zwingt das Bild in jede Ecke, auch wenn es verzerrt.
+     Wenn du es proportional willst, nimm wieder 'contain'. */
   object-fit: fill; 
-
-  /* OPTION B: Wenn die Steine perfekt RUND bleiben sollen 
-     (dann könnten je nach Handy-Modell kleine Ränder bleiben):
-     object-fit: contain; 
-  */
-
-  image-rendering: auto;
-  -webkit-touch-callout: none;
-  touch-action: none;
+  
+  display: block;
+  z-index: 9999;
 }
