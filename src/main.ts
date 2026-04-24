@@ -10,8 +10,7 @@ boardImg.src = 'TronBoardFAV.jpg';
 // --- KONFIGURATION ---
 const GRID = { 
   startX: 1158, gap: 81, barWidth: 66, 
-  bottomY: 505, topY: 90, stackOffset: 22, 
-  diceYOffset: -130 
+  bottomY: 505, topY: 90, stackOffset: 22 
 };
 const CHECKER_CONFIG = { radius: 17, cyan: '#00f2ff', magenta: '#ff00ff' };
 
@@ -44,7 +43,8 @@ const getLogYForPoint = (idx: number, i: number) => {
   return idx < 12 ? GRID.bottomY - (i * GRID.stackOffset) : GRID.topY + (i * GRID.stackOffset);
 };
 
-const barCenterX = 595;
+// Hilfsfunktion für die tatsächliche Mitte des Canvas
+const getCanvasCenter = () => canvas.width / 2;
 
 const getPipCount = (player: 'cyan' | 'magenta') => {
   let pips = state.bar[player] * 25;
@@ -68,39 +68,36 @@ function drawChecker(x: number, y: number, color: string) {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (boardImg.complete) ctx.drawImage(boardImg, 0, 0);
+  if (boardImg.complete) {
+    ctx.drawImage(boardImg, 0, 0);
+  }
 
-  // Pip Counts zeichnen
+  const centerX = getCanvasCenter();
+
+  // Pip Counts zeichnen (Zentriert)
   ctx.save();
-  ctx.font = "bold 24px monospace"; ctx.textAlign = "center";
-  ctx.fillStyle = CHECKER_CONFIG.cyan; ctx.shadowColor = CHECKER_CONFIG.cyan; ctx.shadowBlur = 10;
-  ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
+  ctx.font = "bold 30px monospace"; ctx.textAlign = "center";
+  ctx.fillStyle = CHECKER_CONFIG.cyan; ctx.shadowColor = CHECKER_CONFIG.cyan; ctx.shadowBlur = 15;
+  ctx.fillText(getPipCount('cyan').toString(), centerX, 60);
+  
   ctx.fillStyle = CHECKER_CONFIG.magenta; ctx.shadowColor = CHECKER_CONFIG.magenta;
-  ctx.fillText(getPipCount('magenta').toString(), barCenterX, 550);
+  ctx.fillText(getPipCount('magenta').toString(), centerX, boardImg.height - 30);
   ctx.restore();
 
   // Steine zeichnen
   animState.checkers.forEach(c => drawChecker(c.x, c.y, c.color));
 
-  // Würfel zeichnen (Pasch-optimiert)
+  // Würfel zeichnen
   animState.dice.forEach(d => {
     ctx.save();
-    ctx.shadowBlur = 15; ctx.shadowColor = CHECKER_CONFIG[state.currentPlayer];
-    ctx.fillStyle = "rgba(0,0,0,0.9)"; ctx.strokeStyle = ctx.shadowColor; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(d.x, d.y, 45, 45, 8); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fff"; ctx.font = "bold 28px Arial"; ctx.textAlign = "center";
-    ctx.fillText(d.value.toString(), d.x + 22, d.y + 33);
+    const color = state.currentPlayer === 'cyan' ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
+    ctx.shadowBlur = 20; ctx.shadowColor = color;
+    ctx.fillStyle = "rgba(0,0,0,0.95)"; ctx.strokeStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(d.x, d.y, 60, 60, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = "bold 35px Arial"; ctx.textAlign = "center";
+    ctx.fillText(d.value.toString(), d.x + 30, d.y + 42);
     ctx.restore();
   });
-
-  if (state.message) {
-    ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.roundRect(canvas.width/2 - 150, 280, 300, 60, 10); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "white"; ctx.font = "bold 22px Arial"; ctx.textAlign = "center";
-    ctx.fillText(state.message, canvas.width/2, 318);
-    ctx.restore();
-  }
 
   requestAnimationFrame(render);
 }
@@ -113,29 +110,36 @@ async function rollDice() {
   const r1 = Math.floor(Math.random() * 6) + 1;
   const r2 = Math.floor(Math.random() * 6) + 1;
   
-  // Pasch-Regel: Bei gleichen Zahlen gibt es 4 Züge
   state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
   
+  const centerX = getCanvasCenter();
+  const startY = 200;
+
   animState.dice = state.dice.map((val, i) => ({
     value: val,
-    x: barCenterX - 22,
-    y: 180 + (i * 55) // Würfel untereinander stapeln
+    x: centerX - 30, // Genau mittig
+    y: startY + (i * 70) // Untereinander
   }));
 
   await new Promise(r => setTimeout(r, 600));
   state.isProcessing = false;
-  
-  // Hier würde die Prüfung auf "KEIN ZUG MÖGLICH" folgen
 }
 
+// Event-Listener für Klick/Touch (auf dem ganzen Spielfeld)
+const handleInput = () => {
+  if (state.dice.length === 0) rollDice();
+};
+
+canvas.addEventListener('mousedown', handleInput);
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  if (state.dice.length === 0) rollDice();
+  handleInput();
 });
 
 boardImg.onload = () => {
   canvas.width = boardImg.width;
   canvas.height = boardImg.height;
+  
   state.board.forEach((count, idx) => {
     for (let i = 0; i < Math.abs(count); i++) {
       animState.checkers.push({ 
