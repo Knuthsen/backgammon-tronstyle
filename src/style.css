@@ -25,7 +25,7 @@ canvas {
   
   /* 'fill' zwingt das Bild in jede Ecke, auch wenn es verzerrt.
      Wenn du es proportional willst, nimm wieder 'contain'. */
-  object-fit: fill; 
+  object-fit: contain; 
   
   display: block;
   z-index: 9999;
