@@ -26,7 +26,7 @@ canvas {
   display: block;
   width: 100vw !important;
   height: 100vh !important;
-  object-fit: fill; /* Streckt das Bild jetzt sauber in alle 4 Ecken */
+  object-fit: contain; /* Streckt das Bild jetzt sauber in alle 4 Ecken */
   
   /* Deaktiviert Safari-Features, die stören */
   touch-action: none;
