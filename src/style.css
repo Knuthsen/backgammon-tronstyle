@@ -4,29 +4,31 @@
   box-sizing: border-box;
 }
 
-html, body {
+body, html {
   width: 100%;
   height: 100%;
-  padding: 0;
-  margin: 0;
-  /* Das hier ignoriert die Ränder für Kamera-Notch und Home-Balken */
-  padding-bottom: env(safe-area-inset-bottom); 
-  background: #000;
+  background-color: #000;
   overflow: hidden;
-}
-
-
-canvas {
-  position: absolute;
+  position: fixed; /* Ganz wichtig gegen den "Wackel"-Effekt */
   top: 0;
   left: 0;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+canvas {
+  display: block;
   width: 100vw !important;
   height: 100vh !important;
+  object-fit: fill; /* Streckt das Bild jetzt sauber in alle 4 Ecken */
   
-  /* 'fill' zwingt das Bild in jede Ecke, auch wenn es verzerrt.
-     Wenn du es proportional willst, nimm wieder 'contain'. */
-  object-fit: contain; 
-  
-  display: block;
-  z-index: 9999;
+  /* Deaktiviert Safari-Features, die stören */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
