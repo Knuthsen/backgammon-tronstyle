@@ -1,14 +1,12 @@
-/* Verhindert Scrollen und graue Ränder auf dem iPhone */
-html, body {
+body, html {
   margin: 0;
   padding: 0;
   width: 100%;
   height: 100%;
   background-color: #000;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  /* Verhindert "Gummiband"-Effekt beim Ziehen auf iOS */
+  position: fixed; 
 }
 
 #app {
@@ -20,14 +18,17 @@ html, body {
 }
 
 canvas {
-  /* Das ist der Zauberstab: */
-  max-width: 100vw;
-  max-height: 100vh;
-  width: auto;
-  height: auto;
-  object-fit: contain; /* Erhält das Seitenverhältnis, nutzt aber den Platz aus */
+  /* Erzwingt maximale Ausnutzung des Bildschirms */
+  display: block;
+  width: 100vw !important;
+  height: 100vh !important;
+  /* 'contain' sorgt dafür, dass das Bild nicht verzerrt wird, 
+     aber so groß wie möglich skaliert */
+  object-fit: contain; 
   
-  /* Verhindert das typische "Blaue Markieren" beim schnellen Tippen am Handy */
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
+  /* Speziell für iOS Safari */
+  image-rendering: -webkit-optimize-contrast;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
