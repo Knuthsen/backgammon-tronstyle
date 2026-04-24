@@ -459,26 +459,30 @@ function initAnimCheckers() {
   });
 }
 
+
 function resizeGame() {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
   if (!canvas) return;
   
-  // Wir sagen dem Browser, dass das Canvas-Element 
-  // optisch den ganzen Platz einnehmen soll
+  // Nutze die volle Fenstergröße
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
   
-  window.scrollTo(0, 0); // Versteckt die Adressleiste in Safari so gut es geht
+  // Zwinge das Bild in die Ecken
+  canvas.style.objectFit = 'fill'; 
+  
+  window.scrollTo(0, 0);
 }
 
-// Bei jeder Größenänderung oder beim Drehen ausführen
-window.addEventListener('resize', resizeGame);
-window.addEventListener('orientationchange', resizeGame);
 
 boardImg.onload = () => { 
+  // ENTFERNE DAS "+ 150" HIER:
   canvas.width = boardImg.width; 
-  canvas.height = boardImg.height + 150; 
+  canvas.height = boardImg.height; 
+  
   resizeGame();
   initAnimCheckers(); 
   render(); 
 };
+
+
