@@ -475,31 +475,6 @@ function resizeGame() {
 window.addEventListener('resize', resizeGame);
 window.addEventListener('orientationchange', resizeGame);
 
-function forceFullScreen() {
-  const cv = document.getElementById('gameCanvas') as HTMLCanvasElement;
-  if (!cv) return;
-
-  // Erzwingt die Maße des iPhones
-  cv.style.position = 'fixed';
-  cv.style.top = '0px';
-  cv.style.left = '0px';
-  cv.style.width = window.innerWidth + 'px';
-  cv.style.height = window.innerHeight + 'px';
-  
-  // Zwingt das Bild, sich zu dehnen (fill)
-  cv.style.objectFit = 'fill'; 
-  
-  console.log("Fullsreen Force angewendet:", window.innerWidth, window.innerHeight);
-}
-
-// Sofort und nach kurzer Verzögerung ausführen (Safari braucht manchmal Bedenkzeit)
-forceFullScreen();
-setTimeout(forceFullScreen, 500);
-
-// Auch beim Drehen des Handys korrigieren
-window.addEventListener('resize', forceFullScreen);
-
-
 boardImg.onload = () => { 
   canvas.width = boardImg.width; 
   canvas.height = boardImg.height + 150; 
