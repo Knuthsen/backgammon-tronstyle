@@ -31,7 +31,7 @@ canvas {
   
   /* OPTION A: Wenn das Bild den ganzen Schirm füllen soll, 
      auch wenn es dabei leicht verzerrt wird: */
-  object-fit: contain; 
+  object-fit: fill; 
 
   /* OPTION B: Wenn die Steine perfekt RUND bleiben sollen 
      (dann könnten je nach Handy-Modell kleine Ränder bleiben):
