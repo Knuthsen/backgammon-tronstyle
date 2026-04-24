@@ -4,12 +4,16 @@
   box-sizing: border-box;
 }
 
-body, html {
+html, body {
   width: 100%;
   height: 100%;
   background-color: #000;
+  /* Verhindert jegliches Scrollen, das Platz verschwenden könnte */
   overflow: hidden;
   position: fixed;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 #app {
@@ -21,7 +25,19 @@ body, html {
 }
 
 canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain; /* Erhält das Seitenverhältnis deines Tron-Bretts */
+  /* Zwingt das Canvas, sich so weit auszudehnen, bis es ENTWEDER 
+     links/rechts ODER oben/unten anstößt */
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  
+  /* Das sorgt für die Zentrierung */
+  margin: auto;
+  
+  /* Schärfere Darstellung auf Retina-Displays */
+  image-rendering: -webkit-optimize-contrast;
+  
+  /* Verhindert, dass Safari beim Tippen reinzoomt */
+  touch-action: none;
 }
