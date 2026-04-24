@@ -1,13 +1,15 @@
-body, html {
+* {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
   width: 100%;
   height: 100%;
   background-color: #000;
-  overflow: hidden; /* Verhindert Wackeln/Scrollen */
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  overflow: hidden;
+  position: fixed;
 }
 
 #app {
@@ -19,16 +21,7 @@ body, html {
 }
 
 canvas {
-  /* Das zwingt das Spiel auf die volle Breite des iPhones */
-  width: 100vw !important;
-  height: auto !important; 
-  
-  /* Falls das Handy sehr lang ist, sorgt das hier dafür, dass es nicht oben/unten rausragt */
-  max-height: 100vh;
-  
-  object-fit: contain;
-  display: block;
-  
-  /* Verhindert den grauen Kasten beim Klicken auf iOS */
-  -webkit-tap-highlight-color: transparent;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain; /* Erhält das Seitenverhältnis deines Tron-Bretts */
 }
