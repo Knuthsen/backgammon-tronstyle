@@ -50,6 +50,7 @@ const state = {
   bar: { cyan: 0, magenta: 0 },
   off: { cyan: 0, magenta: 0 },
   message: "" as string,
+  gameEnded: false, 
   isProcessing: false,
   validTargets: [] as number[]
 };
@@ -177,7 +178,12 @@ function executeBearOff(from: number, die: number) {
   const dIdx = animState.dice.findIndex(d => d.value === die && d.alpha === 1);
   if (dIdx !== -1) animState.dice.splice(dIdx, 1);
   state.selectedPoint = null; state.validTargets = [];
-  if (state.off[p] === 15) { state.message = `${p.toUpperCase()} GEWINNT!`; return; }
+  if (state.off[p] === 15) { 
+    const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
+    state.message = `${winnerName} GEWINNT!`; 
+    state.gameEnded = true; // Sperrt weitere Züge
+    return; 
+  }
   if (!state.isProcessing) checkGameState();
 }
 
@@ -382,12 +388,35 @@ function render() {
   ctx.fillText(getPipCount('magenta').toString(), barCenterX, boardImg.height - 225);
   ctx.restore();
 
+  // Nur zeichnen, wenn das Spiel noch läuft
+if (!state.gameEnded) {
   if (state.dice.length === 0 && state.message === "" && state.currentPlayer === 'magenta') {
     const x = barCenterX, y = boardMid + GRID.diceYOffset + 45;
     ctx.save(); ctx.translate(x, y); ctx.shadowBlur = 15; ctx.shadowColor = CHECKER_CONFIG.magenta;
     ctx.strokeStyle = CHECKER_CONFIG.magenta; ctx.lineWidth = 2; ctx.fillStyle = "rgba(0,0,0,0.9)";
     ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(20, 0); ctx.lineTo(0, 20); ctx.lineTo(-20, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   }
+} else {
+  // Wenn das Spiel vorbei ist: Zeige "NEUES SPIEL" Button
+  const x = barCenterX, y = boardMid + GRID.diceYOffset + 45;
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.8)";
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = "#fff";
+  ctx.beginPath();
+  ctx.roundRect(x - 70, y - 20, 140, 40, 10);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.font = "bold 16px monospace";
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("NEUES SPIEL", x, y);
+  ctx.restore();
+}
 
   animState.dice.forEach(d => {
     ctx.save(); ctx.translate(d.x + 22, d.y + 22); ctx.rotate(d.rotation * Math.PI/180); ctx.translate(-22, -22); ctx.globalAlpha = d.alpha;
@@ -406,32 +435,63 @@ function render() {
 
 // --- INTERAKTION ---
 function handleInteraction(clientX: number, clientY: number) {
-  if (state.isProcessing || state.currentPlayer === 'cyan') return;
+  // 1. Koordinaten berechnen (muss immer zuerst passieren)
   const rect = canvas.getBoundingClientRect();
   const x = (clientX - rect.left) * (canvas.width / rect.width);
   const y = (clientY - rect.top) * (canvas.height / rect.height);
   const boardMid = boardImg.height / 2;
 
+  // 2. Spezialfall: Spiel beendet (Pinky oder Brain hat gewonnen)
+  if (state.gameEnded) {
+    const buttonX = barCenterX;
+    const buttonY = boardMid + GRID.diceYOffset + 45;
+
+    // Prüfen, ob der Klick innerhalb des "NEUES SPIEL" Buttons liegt
+    if (Math.abs(x - buttonX) < 70 && Math.abs(y - buttonY) < 20) {
+      location.reload(); // Seite neu laden für ein neues Spiel
+    }
+    return; // Alle weiteren Interaktionen blockieren, wenn das Spiel vorbei ist
+  }
+
+  // 3. Normale Blockaden (KI ist am Zug oder berechnet gerade)
+  if (state.isProcessing || state.currentPlayer === 'cyan') return;
+
+  // 4. Würfeln (Nur wenn Pinky keine Würfel mehr hat)
   if (Math.abs(x - barCenterX) < 40 && state.dice.length === 0 && y > boardMid + GRID.diceYOffset && y < boardMid + GRID.diceYOffset + 150) {
-    const r1 = Math.floor(Math.random()*6)+1, r2 = Math.floor(Math.random()*6)+1;
-    // PASCH-LOGIK WIEDER EINGEFÜGT
+    const r1 = Math.floor(Math.random() * 6) + 1, r2 = Math.floor(Math.random() * 6) + 1;
+    // Pasch-Logik: 4 Züge bei gleichen Zahlen
     state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2]; 
-    animateDiceShake(); checkGameState(); return;
+    animateDiceShake(); 
+    checkGameState(); 
+    return;
   }
   
+  // Wenn keine Würfel da sind, kann man keine Steine bewegen
   if (state.dice.length === 0) return;
 
+  // 5. Interaktion mit der Bar (Steine, die geschlagen wurden)
   if (Math.abs(x - barCenterX) < 40 && state.bar.magenta > 0) {
-    state.selectedPoint = state.selectedPoint === 'bar' ? null : 'bar'; updateValidTargets(); return;
+    state.selectedPoint = state.selectedPoint === 'bar' ? null : 'bar'; 
+    updateValidTargets(); 
+    return;
   }
+
+  // 6. Interaktion mit dem Spielfeld (Steine ziehen)
   for (let i = 0; i < 24; i++) {
     if (Math.abs(x - getLogXForPoint(i)) < 40) {
+      // Prüfen, ob oben oder unten geklickt wurde (passend zur Point-Hälfte)
       if ((y < boardMid && i >= 12) || (y > boardMid && i < 12)) {
         if (state.selectedPoint === i) {
+          // Falls Stein bereits ausgewählt: Prüfen, ob er rausgespielt werden kann
           const d = state.dice.find(die => canMoveToOff(i, die));
-          if (d) { executeBearOff(i, d); return; }
+          if (d) { 
+            executeBearOff(i, d); 
+            return; 
+          }
         }
-        handleMove(i); break;
+        // Normalen Zug ausführen
+        handleMove(i); 
+        break;
       }
     }
   }
@@ -484,5 +544,3 @@ boardImg.onload = () => {
   initAnimCheckers(); 
   render(); 
 };
-
-
