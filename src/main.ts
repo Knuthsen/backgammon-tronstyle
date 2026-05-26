@@ -180,7 +180,7 @@ function executeBearOff(from: number, die: number) {
   state.selectedPoint = null; state.validTargets = [];
   if (state.off[p] === 15) { 
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
-    state.message = `${winnerName} GEWINNT!`; 
+    state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`; 
     state.gameEnded = true; // Sperrt weitere Züge
     return; 
   }
