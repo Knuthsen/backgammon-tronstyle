@@ -410,6 +410,62 @@ function checkGameState() {
 // --- KI LOGIK (CYAN) ---
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
+// Gibt die Anzahl der Würfelkombinationen (von 36) an, die eine bestimmte Distanz schlagen können
+// Berücksichtigt direkte Würfe und Kombinationen (z.B. Distanz 3 geht mit einer 3, aber auch mit 1+2)
+const HIT_PROBABILITIES: { [key: number]: number } = {
+  1: 11, // Sehr riskant (alle Kombinationen mit einer 1)
+  2: 12,
+  3: 14,
+  4: 15,
+  5: 15,
+  6: 17, // Die 6 ist am gefährlichsten (Direktschuss + Kombinationen wie 1+5, 2+4, 3+3...)
+  7: 6, // Ab hier nur noch Kombinationen aus beiden Würfeln möglich
+  8: 6,
+  9: 5,
+  10: 3,
+  11: 2,
+  12: 3, // Doppelte 3, Doppelte 4 etc.
+};
+
+function getHitDanger(fromIdx: number, tempBoard: number[]): number {
+  let totalDanger = 0;
+
+  // Wir scannen das Board vor dem ungeschützten Stein, um Pinkys Angreifer zu finden.
+  // Da Brain (Cyan) von Feld 0 zu 23 läuft, läuft Pinky (Magenta) von 23 zu 0.
+  // Angreifer für einen Cyan-Stein auf 'fromIdx' stehen also auf Feldern mit HÖHEREM Index.
+  for (let pinkyIdx = fromIdx + 1; pinkyIdx < 24; pinkyIdx++) {
+    // Steht dort mindestens ein Pinky-Stein?
+    if (tempBoard[pinkyIdx] < 0) {
+      const distance = pinkyIdx - fromIdx;
+
+      // Nur Distanzen bis 12 sind in einem einzigen Zug direkt gefährlich
+      if (distance <= 12) {
+        let prob = HIT_PROBABILITIES[distance] || 0;
+
+        // Taktischer Feinschliff: Wenn der Weg durch eine "Mauer" (Blockade) versperrt ist,
+        // sinkt die Gefahr für Zwischenschritte.
+        if (distance > 6) {
+          // Prüfen, ob zwischen Pinky und dem Blot eine Cyan-Mauer (>= 2 Steine) steht
+          for (
+            let checkBlock = pinkyIdx - 1;
+            checkBlock > fromIdx;
+            checkBlock--
+          ) {
+            if (tempBoard[checkBlock] >= 2) {
+              prob *= 0.3; // Gefahr drastisch senken, da Pinky blockiert ist
+              break;
+            }
+          }
+        }
+        totalDanger += prob;
+      }
+    }
+  }
+
+  // Gibt den addierten Gefahrenwert zurück (max. ca. 36)
+  return totalDanger;
+}
+
 function evaluateBoard(
   tempBoard: number[],
   tempBar: { cyan: number; magenta: number },
@@ -418,18 +474,39 @@ function evaluateBoard(
   let score = 0;
   let cyanPips = tempBar.cyan * 25;
   let magPips = tempBar.magenta * 25;
+
   tempBoard.forEach((n, i) => {
     if (n > 0) cyanPips += n * (24 - i);
     if (n < 0) magPips += Math.abs(n) * (i + 1);
   });
+
+  // 1. Pip-Count (Rennspiel-Aspekt)
   score += (magPips - cyanPips) * 3;
+
+  // 2. Board-Struktur bewerten
   tempBoard.forEach((n, i) => {
-    if (n >= 2) score += 15;
-    if (n === 1) score -= 25;
+    if (n >= 2) {
+      score += 15; // Belohnung für sichere Blockaden (Haus)
+    }
+    if (n === 1) {
+      // DYNAMISCH: Berechne, wie gefährlich der Blot wirklich steht
+      const danger = getHitDanger(i, tempBoard);
+
+      if (danger > 0) {
+        // Ein sehr gefährlicher Blot (z.B. Distanz 6 ohne Blockade) gibt massiven Abzug
+        score -= danger * 3.5;
+      } else {
+        // Ein absolut sicherer Blot (keine Pinky-Steine dahinter) gibt kaum Abzug
+        score -= 5;
+      }
+    }
   });
+
+  // 3. Bar und Off-Maße gewichten
   score -= tempBar.cyan * 60;
   score += tempBar.magenta * 50;
   score += tempOff.cyan * 100;
+
   return score;
 }
 
