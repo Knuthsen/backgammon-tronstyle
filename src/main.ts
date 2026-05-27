@@ -507,28 +507,41 @@ function evaluateBoard(
     }
     if (n === 1) {
       const danger = getHitDanger(i, tempBoard);
-      
+
       if (danger > 0) {
         let penalty = danger * 3.5;
-        
-        // Von 45 runter auf 15: Er weiß, es ist das Heimfeld, 
+
+        // Von 45 runter auf 15: Er weiß, es ist das Heimfeld,
         // blockiert sich aber nicht mehr selbst komplett den Weg.
         if (i >= 18) {
-          penalty += 15; 
+          penalty += 15;
         }
-        
-        score -= penalty; 
+
+        score -= penalty;
       } else {
-        score -= 5; 
+        score -= 5;
       }
     }
   }); // Ende der foreach-Schleife
-  
-  // KI-TUNING: Wir belohnen es MEHR, wenn Brain DICH schlägt (+65 statt +50).
-  // Das motiviert ihn, aggressiver nach vorne zu spielen, anstatt nur defensiv zu stehen.
+
+  // --- BAR UND OFF-MASSE GEWICHTEN ---
   score -= tempBar.cyan * 60;
-  score += tempBar.magenta * 65; 
+  score += tempBar.magenta * 65; // Basis-Belohnung für jeden Treffer
   score += tempOff.cyan * 100;
+
+  // NEU: Der "Jagd-Instinkt"-Bonus für Treffer in Pinkys Haus!
+  // Wir prüfen, ob Brain in diesem Zug einen Stein aus Pinkys Haus (Feld 0-5) geschlagen hat.
+  // 'state.board' ist der Zustand VOR dem Zug, 'tempBoard' der simulierte Zustand DANACH.
+  for (let i = 0; i <= 5; i++) {
+    // Wenn vor dem Zug dort Pinky-Steine waren (negativ) und danach weniger oder keine mehr:
+    if (state.board[i] < 0 && tempBoard[i] > state.board[i]) {
+      // Hat Brain ihn komplett runtergeschlagen oder nur dezimiert?
+      // Wenn dort jetzt kein Pinky-Stein mehr steht oder ein Cyan-Stein eingezogen ist:
+      if (tempBoard[i] >= 0) {
+        score += 80; // Ein fetter Bonus von +80 Punkten extra für die Demütigung in deinem eigenen Haus!
+      }
+    }
+  }
   
   return score;
 }
