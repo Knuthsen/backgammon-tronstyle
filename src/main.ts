@@ -430,29 +430,27 @@ const HIT_PROBABILITIES: { [key: number]: number } = {
 function getHitDanger(fromIdx: number, tempBoard: number[]): number {
   let totalDanger = 0;
 
-  // Wir scannen das Board vor dem ungeschützten Stein, um Pinkys Angreifer zu finden.
-  // Da Brain (Cyan) von Feld 0 zu 23 läuft, läuft Pinky (Magenta) von 23 zu 0.
-  // Angreifer für einen Cyan-Stein auf 'fromIdx' stehen also auf Feldern mit HÖHEREM Index.
+  // Pinkys Steine, die Brain (auf 'fromIdx') gefährlich werden können,
+  // müssen auf HÖHEREN Feld-Indizes stehen (denn Pinky zieht von 23 Richtung 0).
   for (let pinkyIdx = fromIdx + 1; pinkyIdx < 24; pinkyIdx++) {
-    // Steht dort mindestens ein Pinky-Stein?
     if (tempBoard[pinkyIdx] < 0) {
+      // Da Pinky von oben nach unten zieht, ist die Distanz: Pinky-Feld minus Brain-Feld
       const distance = pinkyIdx - fromIdx;
 
-      // Nur Distanzen bis 12 sind in einem einzigen Zug direkt gefährlich
+      // Nur direkte Schüsse (1 bis 12 Felder Entfernung) sind akut gefährlich
       if (distance <= 12) {
         let prob = HIT_PROBABILITIES[distance] || 0;
 
-        // Taktischer Feinschliff: Wenn der Weg durch eine "Mauer" (Blockade) versperrt ist,
-        // sinkt die Gefahr für Zwischenschritte.
+        // Blockaden-Check: Steht eine Cyan-Mauer im Weg, die Pinkys Wurf blockiert?
         if (distance > 6) {
-          // Prüfen, ob zwischen Pinky und dem Blot eine Cyan-Mauer (>= 2 Steine) steht
+          // Wir prüfen die Felder zwischen Pinky und dem Blot
           for (
             let checkBlock = pinkyIdx - 1;
             checkBlock > fromIdx;
             checkBlock--
           ) {
             if (tempBoard[checkBlock] >= 2) {
-              prob *= 0.3; // Gefahr drastisch senken, da Pinky blockiert ist
+              prob *= 0.3; // Gefahr drastisch senken, da Pinky blockiert wird
               break;
             }
           }
@@ -462,7 +460,26 @@ function getHitDanger(fromIdx: number, tempBoard: number[]): number {
     }
   }
 
-  // Gibt den addierten Gefahrenwert zurück (max. ca. 36)
+  // WICHTIG: Pinky kann Brain auch von der Bar aus schlagen (wenn Pinky draußen ist)!
+  // Wenn Pinky auf der Bar liegt, würfelt er von "außerhalb" (Feld 24 aus Pinkys Sicht)
+  // in Brains Heimfeld (Feld 23 bis 18) hinein.
+  // ... (Bisheriger Code der getHitDanger Funktion)
+
+  if (state.bar.magenta > 0) {
+    const barDistance = 24 - fromIdx;
+    if (barDistance <= 6) {
+      totalDanger += HIT_PROBABILITIES[barDistance] || 0;
+    }
+  }
+
+  // NEU: Strategische Risiko-Gewichtung nach Position (Konsequenz-Faktor)
+  // Je weiter vorne der Stein steht (höherer Index), desto schlimmer ist ein Treffer!
+  if (fromIdx >= 18) {
+    totalDanger *= 3.0; // Dreifache Angst vor Treffern im eigenen Haus!
+  } else if (fromIdx >= 12) {
+    totalDanger *= 1.5; // Erhöhte Vorsicht in der gegnerischen Hälfte
+  }
+
   return totalDanger;
 }
 
@@ -489,14 +506,22 @@ function evaluateBoard(
       score += 15; // Belohnung für sichere Blockaden (Haus)
     }
     if (n === 1) {
-      // DYNAMISCH: Berechne, wie gefährlich der Blot wirklich steht
+      // Berechne die taktische Gefahr
       const danger = getHitDanger(i, tempBoard);
 
       if (danger > 0) {
-        // Ein sehr gefährlicher Blot (z.B. Distanz 6 ohne Blockade) gibt massiven Abzug
-        score -= danger * 3.5;
+        // Basis-Abzug basierend auf der Trefferwahrscheinlichkeit
+        let penalty = danger * 3.5;
+
+        // KRITISCHE KORREKTUR: Zusätzlicher strategischer Strafpunkt im eigenen Haus!
+        // Das bricht den blinden Drang, Steine ungeschützt "nach Hause" zu bringen.
+        if (i >= 18) {
+          penalty += 45; // Ein dicker Extra-Malus für ungeschützte Steine im Heimfeld
+        }
+
+        score -= penalty;
       } else {
-        // Ein absolut sicherer Blot (keine Pinky-Steine dahinter) gibt kaum Abzug
+        // Ein absolut sicherer Blot ohne Angreifer dahinter
         score -= 5;
       }
     }
