@@ -475,9 +475,9 @@ function getHitDanger(fromIdx: number, tempBoard: number[]): number {
   // NEU: Strategische Risiko-Gewichtung nach Position (Konsequenz-Faktor)
   // Je weiter vorne der Stein steht (höherer Index), desto schlimmer ist ein Treffer!
   if (fromIdx >= 18) {
-    totalDanger *= 3.0; // Dreifache Angst vor Treffern im eigenen Haus!
+    totalDanger *= 1.8; // 1.8-fache Angst vor Treffern im eigenen Haus!
   } else if (fromIdx >= 12) {
-    totalDanger *= 1.5; // Erhöhte Vorsicht in der gegnerischen Hälfte
+    totalDanger *= 1.3; // Erhöhte Vorsicht in der gegnerischen Hälfte
   }
 
   return totalDanger;
@@ -506,32 +506,30 @@ function evaluateBoard(
       score += 15; // Belohnung für sichere Blockaden (Haus)
     }
     if (n === 1) {
-      // Berechne die taktische Gefahr
       const danger = getHitDanger(i, tempBoard);
-
+      
       if (danger > 0) {
-        // Basis-Abzug basierend auf der Trefferwahrscheinlichkeit
         let penalty = danger * 3.5;
-
-        // KRITISCHE KORREKTUR: Zusätzlicher strategischer Strafpunkt im eigenen Haus!
-        // Das bricht den blinden Drang, Steine ungeschützt "nach Hause" zu bringen.
+        
+        // Von 45 runter auf 15: Er weiß, es ist das Heimfeld, 
+        // blockiert sich aber nicht mehr selbst komplett den Weg.
         if (i >= 18) {
-          penalty += 45; // Ein dicker Extra-Malus für ungeschützte Steine im Heimfeld
+          penalty += 15; 
         }
-
-        score -= penalty;
+        
+        score -= penalty; 
       } else {
-        // Ein absolut sicherer Blot ohne Angreifer dahinter
-        score -= 5;
+        score -= 5; 
       }
     }
-  });
-
-  // 3. Bar und Off-Maße gewichten
+  }); // Ende der foreach-Schleife
+  
+  // KI-TUNING: Wir belohnen es MEHR, wenn Brain DICH schlägt (+65 statt +50).
+  // Das motiviert ihn, aggressiver nach vorne zu spielen, anstatt nur defensiv zu stehen.
   score -= tempBar.cyan * 60;
-  score += tempBar.magenta * 50;
+  score += tempBar.magenta * 65; 
   score += tempOff.cyan * 100;
-
+  
   return score;
 }
 
