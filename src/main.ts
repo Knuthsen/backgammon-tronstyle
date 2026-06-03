@@ -6,6 +6,15 @@ import './style.css';
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
+// --- DYNAMISCHE CRT-OVERLAY INJEKTION ---
+const scanlinesDiv = document.createElement('div');
+scanlinesDiv.className = 'crt-scanlines';
+const vignetteDiv = document.createElement('div');
+vignetteDiv.className = 'crt-vignette';
+document.body.appendChild(scanlinesDiv);
+document.body.appendChild(vignetteDiv);
+
+// Das Board-Bild laden
 const boardImg = new Image();
 boardImg.src = 'TronBoardFAV.jpg';
 
@@ -67,13 +76,24 @@ const animState = {
     y: number;
     color: string;
     pointIdx: number | 'bar' | 'off';
+    alpha?: number;
   }>,
   dice: [] as Array<{
     value: number;
+    displayValue?: number;
     x: number;
     y: number;
     alpha: number;
     rotation: number;
+    isRolling?: boolean;
+  }>,
+  particles: [] as Array<{
+    x: number;
+    y: number;
+    alpha: number;
+    size: number;
+    color: string;
+    shadowBlur: number;
   }>,
 };
 
@@ -155,7 +175,7 @@ function canMoveToOff(from: number, die: number): boolean {
 function animateCheckerMove(
   player: 'cyan' | 'magenta',
   from: number | 'bar',
-  to: number
+  to: number | 'bar'
 ) {
   let checker;
   if (from === 'bar') {
@@ -174,11 +194,69 @@ function animateCheckerMove(
         : pts.reduce((p, c) => (p.y > c.y ? p : c), pts[0]);
   }
   if (!checker) return;
+
   let tx, ty;
   if (to === 'bar') {
     const pos = getLogPosForBar(player, state.bar[player]);
     tx = pos.x;
     ty = pos.y;
+
+    const startX = checker.x;
+    const startY = checker.y;
+    checker.pointIdx = 'bar';
+
+    const particleCount = 32;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 45 + 15;
+      const p = {
+        x: startX,
+        y: startY,
+        alpha: 1,
+        size: Math.random() * 3 + 1.5,
+        color: checker.color,
+        shadowBlur: 10
+      };
+      animState.particles.push(p);
+
+      const burstX = startX + Math.cos(angle) * speed;
+      const burstY = startY + Math.sin(angle) * speed;
+
+      const tl = gsap.timeline({
+        onComplete: () => {
+          const pIdx = animState.particles.indexOf(p);
+          if (pIdx !== -1) animState.particles.splice(pIdx, 1);
+        }
+      });
+
+      tl.to(p, {
+        x: burstX,
+        y: burstY,
+        duration: 0.22,
+        ease: 'power2.out'
+      })
+      .to(p, {
+        x: tx + (Math.random() - 0.5) * 16,
+        y: ty + (Math.random() - 0.5) * 16,
+        alpha: 0,
+        size: 0.5,
+        duration: 0.58,
+        ease: 'power1.in',
+        delay: Math.random() * 0.06
+      });
+    }
+
+    checker.alpha = 0;
+    checker.x = tx;
+    checker.y = ty;
+
+    gsap.to(checker, {
+      alpha: 1,
+      duration: 0.45,
+      delay: 0.42,
+      ease: 'power2.in'
+    });
+    return;
   } else {
     tx = getLogXForPoint(to);
     ty = getLogYForPoint(
@@ -187,6 +265,7 @@ function animateCheckerMove(
       Math.abs(state.board[to]) + 1
     );
   }
+  
   checker.pointIdx = to;
   gsap.to(checker, { x: tx, y: ty, duration: 0.55, ease: 'power2.out' });
 }
@@ -208,9 +287,11 @@ function animateToOff(player: 'cyan' | 'magenta', from: number) {
   });
 }
 
-function animateDiceShake() {
+function animateDiceShake(onCompleteCallback?: () => void) {
   animState.dice = [];
   const boardMid = boardImg.height / 2;
+  let completedCount = 0;
+
   state.dice.forEach((val, i) => {
     let logX = barCenterX - 22,
       logY = boardMid + GRID.diceYOffset;
@@ -226,20 +307,37 @@ function animateDiceShake() {
     } else {
       logY += i * 55;
     }
+
     const die = {
       value: val,
+      displayValue: Math.floor(Math.random() * 6) + 1,
       x: logX,
       y: logY,
       alpha: 0,
-      rotation: (Math.random() - 0.5) * 90,
+      rotation: (Math.random() - 0.5) * 720,
+      isRolling: true
     };
     animState.dice.push(die);
+
     gsap.to(die, {
       alpha: 1,
       rotation: 0,
-      duration: 0.4,
-      ease: 'back.out(1.7)',
-      delay: i * 0.1,
+      duration: 0.65,
+      ease: 'power2.out',
+      delay: i * 0.08,
+      onUpdate: () => {
+        if (die.isRolling && Math.random() < 0.4) {
+          die.displayValue = Math.floor(Math.random() * 6) + 1;
+        }
+      },
+      onComplete: () => {
+        die.displayValue = die.value;
+        die.isRolling = false;
+        completedCount++;
+        if (completedCount === state.dice.length && onCompleteCallback) {
+          onCompleteCallback();
+        }
+      }
     });
   });
 }
@@ -259,12 +357,9 @@ function executeBearOff(from: number, die: number) {
   if (state.off[p] === 15) {
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
     state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
-
-    // ALLE RESTLICHEN WÜRFEL BEI SIEG ENTFERNEN:
     state.dice = [];
     animState.dice = [];
-
-    state.gameEnded = true; // Sperrt weitere Züge
+    state.gameEnded = true;
     return;
   }
   if (!state.isProcessing) checkGameState();
@@ -397,35 +492,18 @@ function checkGameState() {
 // --- KI LOGIK (CYAN) ---
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-// Gibt die Anzahl der Würfelkombinationen (von 36) an, die eine bestimmte Distanz schlagen können
-// Berücksichtigt direkte Würfe und Kombinationen (z.B. Distanz 3 geht mit einer 3, aber auch mit 1+2)
 const HIT_PROBABILITIES: { [key: number]: number } = {
-  1: 11, // Sehr riskant (alle Kombinationen mit einer 1)
-  2: 12,
-  3: 14,
-  4: 15,
-  5: 15,
-  6: 17, // Die 6 ist am gefährlichsten (Direktschuss + Kombinationen wie 1+5, 2+4, 3+3...)
-  7: 6, // Ab hier nur noch Kombinationen aus beiden Würfeln möglich
-  8: 6,
-  9: 5,
-  10: 3,
-  11: 2,
-  12: 3, // Doppelte 3, Doppelte 4 etc.
+  1: 11, 2: 12, 3: 14, 4: 15, 5: 15, 6: 17,
+  7: 6, 8: 6, 9: 5, 10: 3, 11: 2, 12: 3,
 };
 
 function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: number): number {
   let totalDanger = 0;
-
-  // Pinkys Steine auf dem Feld prüfen
   for (let pinkyIdx = fromIdx + 1; pinkyIdx < 24; pinkyIdx++) {
     if (tempBoard[pinkyIdx] < 0) {
       const distance = pinkyIdx - fromIdx;
-
       if (distance <= 12) {
         let prob = HIT_PROBABILITIES[distance] || 0;
-
-        // Blockaden-Check
         if (distance > 6) {
           for (let checkBlock = pinkyIdx - 1; checkBlock > fromIdx; checkBlock--) {
             if (tempBoard[checkBlock] >= 2) {
@@ -439,7 +517,6 @@ function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: numb
     }
   }
 
-  // JETZT RICHTIG: Nutze den simulierten Wert der Bar!
   if (tempBarMagenta > 0) {
     const barDistance = 24 - fromIdx;
     if (barDistance <= 6) {
@@ -447,17 +524,14 @@ function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: numb
     }
   }
 
-  // Strategischer Charakter-Shift
   if (fromIdx >= 18) {
-    totalDanger *= 2.0; // Höchste Vorsicht im eigenen Heimfeld!
+    totalDanger *= 2.0;
   } else if (fromIdx <= 5) {
-    totalDanger *= 0.4; // Mutig in Pinkys Haus agieren
+    totalDanger *= 0.4;
   }
-
   return totalDanger;
 }
 
-// --- PERFIDES EVALUATE BOARD MIT JÄGERMODUS & PRIME-BONUS ---
 function evaluateBoard(
   tempBoard: number[],
   tempBar: { cyan: number; magenta: number },
@@ -472,32 +546,19 @@ function evaluateBoard(
     if (n < 0) magPips += Math.abs(n) * (i + 1);
   });
 
-  // 1. Pip-Count (Rennspiel-Aspekt)
   score += (magPips - cyanPips) * 3;
 
-  // 2. Board-Struktur bewerten
   tempBoard.forEach((n, i) => {
     if (n >= 2) {
-      if (i >= 18) {
-        score += 70; // Von 55 auf 70 erhöht: Blockaden im Heimfeld sind oberste Pflicht!
-      } else {
-        score += 15;
-      }
-
-      // Noch härtere Anti-Tower-Allergie!
-      if (n > 3) {
-        score -= (n - 3) * 45;
-      }
+      if (i >= 18) score += 70;
+      else score += 15;
+      if (n > 3) score -= (n - 3) * 45;
     }
-
     if (n === 1) {
-      // HIER tempBar.magenta übergeben statt dem globalen State!
       const danger = getHitDanger(i, tempBoard, tempBar.magenta);
       if (danger > 0) {
         let penalty = danger * 3.5;
-        if (i >= 18) {
-          penalty += 15;
-        }
+        if (i >= 18) penalty += 15;
         score -= penalty;
       } else {
         score -= 5;
@@ -505,23 +566,16 @@ function evaluateBoard(
     }
   });
 
-  // Basis-Belohnungen
   score -= tempBar.cyan * 60;
   score += tempBar.magenta * 65;
   score += tempOff.cyan * 100;
 
-  // RE-INTEGRATION: Der erbarmungslose Jagd-Instinkt in Pinkys Festung (0-5)
   for (let i = 0; i <= 5; i++) {
     if (state.board[i] < 0 && tempBoard[i] > state.board[i]) {
-      if (tempBoard[i] >= 0) {
-        score += 95; // Fette Prämie für das Eliminieren von Pinky in ihrer Heimat!
-      }
+      if (tempBoard[i] >= 0) score += 95;
     }
   }
 
-  // BRANDNEU: Der Prime-Wall-Bonus (Zusammenhängende Blockaden im eigenen Haus)
-  // Wenn Brain es schafft, 2, 3 oder mehr Punkte am Stück im Haus zu besetzen,
-  // wird Pinky gnadenlos eingemauert.
   let consecutiveBlocks = 0;
   for (let i = 18; i <= 23; i++) {
     if (tempBoard[i] >= 2) {
@@ -536,12 +590,10 @@ function evaluateBoard(
   return score;
 }
 
-// --- INTELLIGENTE LOOK-AHEAD-SUCHE (VOLLSTÄNDIGE ZUGFOLGEN SIMULIEREN) ---
 function findBestAiMove() {
   let bestMove = null;
   let maxFinalScore = -Infinity;
 
-  // Rekursive Tiefensuche über alle verfügbaren Würfel-Kombinationen
   function search(
     currentBoard: number[],
     currentBar: { cyan: number; magenta: number },
@@ -549,12 +601,11 @@ function findBestAiMove() {
     remainingDice: number[],
     moveHistory: any[]
   ) {
-    // Blattschmuck: Keine Würfel mehr übrig -> Endzustand des Zuges bewerten
     if (remainingDice.length === 0) {
       const finalScore = evaluateBoard(currentBoard, currentBar, currentOff);
       if (finalScore > maxFinalScore) {
         maxFinalScore = finalScore;
-        bestMove = moveHistory[0] || null; // Wir brauchen den allerersten Teilschritt
+        bestMove = moveHistory[0] || null;
       }
       return;
     }
@@ -594,14 +645,12 @@ function findBestAiMove() {
         ]);
       };
 
-      // REGEL 1: Bar-Zwang beachten
       if (currentBar.cyan > 0) {
         const to = d - 1;
         if (to >= 0 && to <= 23 && currentBoard[to] >= -1) {
           executeSimMove('bar', false);
         }
       } else {
-        // REGEL 2: Reguläre Züge & Rausspielen
         let canBearOffNow = true;
         for (let idx = 0; idx < 24; idx++) {
           if (currentBoard[idx] > 0 && idx < 18) {
@@ -641,7 +690,6 @@ function findBestAiMove() {
       }
     });
 
-    // Wenn mit keinem Würfel ein Zug möglich war, bewerten wir das vorzeitige Ende
     if (!movedAny) {
       const finalScore = evaluateBoard(currentBoard, currentBar, currentOff);
       if (finalScore > maxFinalScore) {
@@ -662,7 +710,6 @@ async function playAiTurn() {
   await delay(800);
   const r1 = Math.floor(Math.random() * 6) + 1,
     r2 = Math.floor(Math.random() * 6) + 1;
-  // PASCH-LOGIK WIEDER EINGEFÜGT
   state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
   animateDiceShake();
 
@@ -684,7 +731,7 @@ async function playAiTurn() {
   }
 
   state.isProcessing = false;
-  checkGameState(); // Prüft am Ende, ob noch Würfel übrig sind -> triggert "KEIN ZUG MÖGLICH"
+  checkGameState();
 }
 
 // --- RENDERING ---
@@ -694,34 +741,50 @@ function drawChecker(
   color: string,
   isSel: boolean,
   pulse: boolean,
-  isHigh = false
+  isHigh = false,
+  alpha = 1
 ) {
   const p = pulse ? Math.sin(Date.now() * 0.007) * 10 : 0;
   ctx.save();
+  ctx.globalAlpha = alpha;
+  
   if (isHigh) {
+    const activeColor = CHECKER_CONFIG[state.currentPlayer];
     ctx.shadowBlur = 25;
-    ctx.shadowColor = '#fff';
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.shadowColor = activeColor;
+    
+    ctx.fillStyle = activeColor;
+    ctx.globalAlpha = 0.35 * alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, 17, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = activeColor;
     ctx.lineWidth = 3;
-    ctx.setLineDash([5, 5]);
-  } else {
-    ctx.shadowBlur = isSel ? 35 : 12 + p;
-    ctx.shadowColor = isSel ? '#fff' : color;
-    ctx.strokeStyle = isSel ? '#fff' : color;
-    ctx.lineWidth = isSel ? 6 : 4;
+    ctx.globalAlpha = 0.7 * alpha;
+    ctx.stroke();
+    
+    ctx.restore();
+    return;
   }
+
+  ctx.shadowBlur = isSel ? 35 : 12 + p;
+  ctx.shadowColor = isSel ? '#fff' : color;
+  ctx.strokeStyle = isSel ? '#fff' : color;
+  ctx.lineWidth = isSel ? 6 : 4;
+
   ctx.beginPath();
   ctx.arc(x, y, 17, 0, Math.PI * 2);
   ctx.stroke();
-  if (!isHigh) {
-    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x, y, 7, 0, Math.PI * 2);
-    ctx.strokeStyle = isSel ? '#fff' : color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.strokeStyle = isSel ? '#fff' : color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
   ctx.restore();
 }
 
@@ -762,8 +825,22 @@ function render() {
       state.currentPlayer ===
         (c.color === CHECKER_CONFIG.cyan ? 'cyan' : 'magenta') &&
         state.message === '' &&
-        c.pointIdx !== 'off'
+        c.pointIdx !== 'off',
+      false,
+      c.alpha !== undefined ? c.alpha : 1
     );
+  });
+
+  animState.particles.forEach((p) => {
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.shadowBlur = p.shadowBlur;
+    ctx.shadowColor = p.color;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   });
 
   ctx.save();
@@ -771,12 +848,10 @@ function render() {
   ctx.textAlign = 'center';
   ctx.shadowBlur = 10;
   
-  // Cyan Pip-Count
   ctx.fillStyle = CHECKER_CONFIG.cyan;
   ctx.shadowColor = CHECKER_CONFIG.cyan;
   ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
   
-  // JETZT KORREKT: Magenta Pip-Count in Magenta!
   ctx.fillStyle = CHECKER_CONFIG.magenta;
   ctx.shadowColor = CHECKER_CONFIG.magenta;
   ctx.fillText(
@@ -786,34 +861,42 @@ function render() {
   );
   ctx.restore();
 
-  // Nur zeichnen, wenn das Spiel noch läuft
   if (!state.gameEnded) {
     if (
       state.dice.length === 0 &&
       state.message === '' &&
-      state.currentPlayer === 'magenta'
+      state.currentPlayer === 'magenta' &&
+      !state.isProcessing
     ) {
-      const x = barCenterX,
-        y = boardMid + GRID.diceYOffset + 45;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = CHECKER_CONFIG.magenta;
-      ctx.strokeStyle = CHECKER_CONFIG.magenta;
-      ctx.lineWidth = 2;
-      ctx.fillStyle = 'rgba(0,0,0,0.9)';
-      ctx.beginPath();
-      ctx.moveTo(0, -20);
-      ctx.lineTo(20, 0);
-      ctx.lineTo(0, 20);
-      ctx.lineTo(-20, 0);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+      const logX = barCenterX - 22;
+      const baseLogY = boardMid + GRID.diceYOffset;
+      const pulse = Math.sin(Date.now() * 0.007) * 5;
+
+      for (let i = 0; i < 2; i++) {
+        const y = baseLogY + i * 55;
+        ctx.save();
+        ctx.shadowBlur = 12 + pulse;
+        ctx.shadowColor = CHECKER_CONFIG.magenta;
+        ctx.strokeStyle = CHECKER_CONFIG.magenta;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        
+        ctx.beginPath();
+        ctx.roundRect(logX, y, 44, 44, 8);
+        ctx.stroke();
+        
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.font = 'bold 20px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('•', logX + 22, y + 22);
+        ctx.restore();
+      }
     }
   } else {
-    // Wenn das Spiel vorbei ist: Zeige "NEUES SPIEL" Button
     const x = barCenterX,
       y = boardMid + GRID.diceYOffset + 45;
     ctx.save();
@@ -841,7 +924,8 @@ function render() {
     ctx.rotate((d.rotation * Math.PI) / 180);
     ctx.translate(-22, -22);
     ctx.globalAlpha = d.alpha;
-    ctx.shadowBlur = 15;
+    
+    ctx.shadowBlur = d.isRolling ? 25 : 15;
     ctx.shadowColor = CHECKER_CONFIG[state.currentPlayer];
     ctx.strokeStyle = CHECKER_CONFIG[state.currentPlayer];
     ctx.lineWidth = 2;
@@ -854,7 +938,9 @@ function render() {
     ctx.font = 'bold 26px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(d.value.toString(), 22, 24);
+    
+    const valStr = d.displayValue !== undefined ? d.displayValue.toString() : d.value.toString();
+    ctx.fillText(valStr, 22, 24);
     ctx.restore();
   });
 
@@ -865,7 +951,6 @@ function render() {
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    // Breite von 380 auf 460 erhöht, Startpunkt von -190 auf -230 angepasst:
     ctx.roundRect(canvas.width / 2 - 230, boardMid + 60, 460, 60, 12);
     ctx.fill();
     ctx.stroke();
@@ -882,28 +967,22 @@ function render() {
 
 // --- INTERAKTION ---
 function handleInteraction(clientX: number, clientY: number) {
-  // 1. Koordinaten berechnen (muss immer zuerst passieren)
   const rect = canvas.getBoundingClientRect();
   const x = (clientX - rect.left) * (canvas.width / rect.width);
   const y = (clientY - rect.top) * (canvas.height / rect.height);
   const boardMid = boardImg.height / 2;
 
-  // 2. Spezialfall: Spiel beendet (Pinky oder Brain hat gewonnen)
   if (state.gameEnded) {
     const buttonX = barCenterX;
     const buttonY = boardMid + GRID.diceYOffset + 45;
-
-    // Prüfen, ob der Klick innerhalb des "NEUES SPIEL" Buttons liegt
     if (Math.abs(x - buttonX) < 70 && Math.abs(y - buttonY) < 20) {
-      location.reload(); // Seite neu laden für ein neues Spiel
+      location.reload();
     }
-    return; // Alle weiteren Interaktionen blockieren, wenn das Spiel vorbei ist
+    return;
   }
 
-  // 3. Normale Blockaden (KI ist am Zug oder berechnet gerade)
   if (state.isProcessing || state.currentPlayer === 'cyan') return;
 
-  // 4. Würfeln (Nur wenn Pinky keine Würfel mehr hat)
   if (
     Math.abs(x - barCenterX) < 40 &&
     state.dice.length === 0 &&
@@ -912,37 +991,34 @@ function handleInteraction(clientX: number, clientY: number) {
   ) {
     const r1 = Math.floor(Math.random() * 6) + 1,
       r2 = Math.floor(Math.random() * 6) + 1;
-    // Pasch-Logik: 4 Züge bei gleichen Zahlen
     state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
-    animateDiceShake();
-    checkGameState();
+    
+    state.isProcessing = true;
+    animateDiceShake(() => {
+      state.isProcessing = false;
+      checkGameState();
+    });
     return;
   }
 
-  // Wenn keine Würfel da sind, kann man keine Steine bewegen
   if (state.dice.length === 0) return;
 
-  // 5. Interaktion mit der Bar (Steine, die geschlagen wurden)
   if (Math.abs(x - barCenterX) < 40 && state.bar.magenta > 0) {
     state.selectedPoint = state.selectedPoint === 'bar' ? null : 'bar';
     updateValidTargets();
     return;
   }
 
-  // 6. Interaktion mit dem Spielfeld (Steine ziehen)
   for (let i = 0; i < 24; i++) {
     if (Math.abs(x - getLogXForPoint(i)) < 40) {
-      // Prüfen, ob oben oder unten geklickt wurde (passend zur Point-Hälfte)
       if ((y < boardMid && i >= 12) || (y > boardMid && i < 12)) {
         if (state.selectedPoint === i) {
-          // Falls Stein bereits ausgewählt: Prüfen, ob er rausgespielt werden kann
           const d = state.dice.find((die) => canMoveToOff(i, die));
           if (d) {
             executeBearOff(i, d);
             return;
           }
         }
-        // Normalen Zug ausführen
         handleMove(i);
         break;
       }
@@ -976,6 +1052,7 @@ function initAnimCheckers() {
         y: getLogYForPoint(idx, i, abs),
         color: count > 0 ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta,
         pointIdx: idx,
+        alpha: 1,
       });
     }
   });
@@ -984,22 +1061,15 @@ function initAnimCheckers() {
 function resizeGame() {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
   if (!canvas) return;
-
-  // Nutze die volle Fenstergröße
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
-
-  // Zwinge das Bild in die Ecken
   canvas.style.objectFit = 'fill';
-
   window.scrollTo(0, 0);
 }
 
 boardImg.onload = () => {
-  // ENTFERNE DAS "+ 150" HIER:
   canvas.width = boardImg.width;
   canvas.height = boardImg.height;
-
   resizeGame();
   initAnimCheckers();
   render();
