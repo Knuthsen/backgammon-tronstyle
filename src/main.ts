@@ -7,20 +7,7 @@ const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
 const boardImg = new Image();
-boardImg.src = '/TronBoardFAV.jpg';
-boardImg.onload = () => {
-  // 1. Setzt die interne Auflösung auf die Bildgröße
-  canvas.width = boardImg.width;
-  canvas.height = boardImg.height;
-
-  // 2. Falls deine Steine in einer init-Funktion erstellt werden,
-  // muss diese hier aufgerufen werden, damit die Koordinaten stimmen.
-  if (typeof initAnimCheckers === 'function') {
-    initAnimCheckers();
-  }
-
-  console.log('Board geladen:', canvas.width, 'x', canvas.height);
-};
+boardImg.src = 'TronBoardFAV.jpg';
 
 // --- KONFIGURATION ---
 const GRID = {
@@ -427,30 +414,22 @@ const HIT_PROBABILITIES: { [key: number]: number } = {
   12: 3, // Doppelte 3, Doppelte 4 etc.
 };
 
-function getHitDanger(fromIdx: number, tempBoard: number[]): number {
+function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: number): number {
   let totalDanger = 0;
 
-  // Pinkys Steine, die Brain (auf 'fromIdx') gefährlich werden können,
-  // müssen auf HÖHEREN Feld-Indizes stehen (denn Pinky zieht von 23 Richtung 0).
+  // Pinkys Steine auf dem Feld prüfen
   for (let pinkyIdx = fromIdx + 1; pinkyIdx < 24; pinkyIdx++) {
     if (tempBoard[pinkyIdx] < 0) {
-      // Da Pinky von oben nach unten zieht, ist die Distanz: Pinky-Feld minus Brain-Feld
       const distance = pinkyIdx - fromIdx;
 
-      // Nur direkte Schüsse (1 bis 12 Felder Entfernung) sind akut gefährlich
       if (distance <= 12) {
         let prob = HIT_PROBABILITIES[distance] || 0;
 
-        // Blockaden-Check: Steht eine Cyan-Mauer im Weg, die Pinkys Wurf blockiert?
+        // Blockaden-Check
         if (distance > 6) {
-          // Wir prüfen die Felder zwischen Pinky und dem Blot
-          for (
-            let checkBlock = pinkyIdx - 1;
-            checkBlock > fromIdx;
-            checkBlock--
-          ) {
+          for (let checkBlock = pinkyIdx - 1; checkBlock > fromIdx; checkBlock--) {
             if (tempBoard[checkBlock] >= 2) {
-              prob *= 0.3; // Gefahr drastisch senken, da Pinky blockiert wird
+              prob *= 0.3; 
               break;
             }
           }
@@ -460,29 +439,25 @@ function getHitDanger(fromIdx: number, tempBoard: number[]): number {
     }
   }
 
-  // WICHTIG: Pinky kann Brain auch von der Bar aus schlagen (wenn Pinky draußen ist)!
-  // Wenn Pinky auf der Bar liegt, würfelt er von "außerhalb" (Feld 24 aus Pinkys Sicht)
-  // in Brains Heimfeld (Feld 23 bis 18) hinein.
-  // ... (Bisheriger Code der getHitDanger Funktion)
-
-  if (state.bar.magenta > 0) {
+  // JETZT RICHTIG: Nutze den simulierten Wert der Bar!
+  if (tempBarMagenta > 0) {
     const barDistance = 24 - fromIdx;
     if (barDistance <= 6) {
       totalDanger += HIT_PROBABILITIES[barDistance] || 0;
     }
   }
 
-  // NEU: Strategische Risiko-Gewichtung nach Position (Konsequenz-Faktor)
-  // Je weiter vorne der Stein steht (höherer Index), desto schlimmer ist ein Treffer!
+  // Strategischer Charakter-Shift
   if (fromIdx >= 18) {
-    totalDanger *= 1.8; // 1.8-fache Angst vor Treffern im eigenen Haus!
-  } else if (fromIdx >= 12) {
-    totalDanger *= 1.3; // Erhöhte Vorsicht in der gegnerischen Hälfte
+    totalDanger *= 2.0; // Höchste Vorsicht im eigenen Heimfeld!
+  } else if (fromIdx <= 5) {
+    totalDanger *= 0.4; // Mutig in Pinkys Haus agieren
   }
 
   return totalDanger;
 }
 
+// --- PERFIDES EVALUATE BOARD MIT JÄGERMODUS & PRIME-BONUS ---
 function evaluateBoard(
   tempBoard: number[],
   tempBar: { cyan: number; magenta: number },
@@ -503,92 +478,181 @@ function evaluateBoard(
   // 2. Board-Struktur bewerten
   tempBoard.forEach((n, i) => {
     if (n >= 2) {
-      score += 15; // Belohnung für sichere Blockaden (Haus)
-    }
-    if (n === 1) {
-      const danger = getHitDanger(i, tempBoard);
+      if (i >= 18) {
+        score += 70; // Von 55 auf 70 erhöht: Blockaden im Heimfeld sind oberste Pflicht!
+      } else {
+        score += 15;
+      }
 
+      // Noch härtere Anti-Tower-Allergie!
+      if (n > 3) {
+        score -= (n - 3) * 45;
+      }
+    }
+
+    if (n === 1) {
+      // HIER tempBar.magenta übergeben statt dem globalen State!
+      const danger = getHitDanger(i, tempBoard, tempBar.magenta);
       if (danger > 0) {
         let penalty = danger * 3.5;
-
-        // Von 45 runter auf 15: Er weiß, es ist das Heimfeld,
-        // blockiert sich aber nicht mehr selbst komplett den Weg.
         if (i >= 18) {
           penalty += 15;
         }
-
         score -= penalty;
       } else {
         score -= 5;
       }
     }
-  }); // Ende der foreach-Schleife
+  });
 
-  // --- BAR UND OFF-MASSE GEWICHTEN ---
+  // Basis-Belohnungen
   score -= tempBar.cyan * 60;
-  score += tempBar.magenta * 65; // Basis-Belohnung für jeden Treffer
+  score += tempBar.magenta * 65;
   score += tempOff.cyan * 100;
 
-  // NEU: Der "Jagd-Instinkt"-Bonus für Treffer in Pinkys Haus!
-  // Wir prüfen, ob Brain in diesem Zug einen Stein aus Pinkys Haus (Feld 0-5) geschlagen hat.
-  // 'state.board' ist der Zustand VOR dem Zug, 'tempBoard' der simulierte Zustand DANACH.
+  // RE-INTEGRATION: Der erbarmungslose Jagd-Instinkt in Pinkys Festung (0-5)
   for (let i = 0; i <= 5; i++) {
-    // Wenn vor dem Zug dort Pinky-Steine waren (negativ) und danach weniger oder keine mehr:
     if (state.board[i] < 0 && tempBoard[i] > state.board[i]) {
-      // Hat Brain ihn komplett runtergeschlagen oder nur dezimiert?
-      // Wenn dort jetzt kein Pinky-Stein mehr steht oder ein Cyan-Stein eingezogen ist:
       if (tempBoard[i] >= 0) {
-        score += 80; // Ein fetter Bonus von +80 Punkten extra für die Demütigung in deinem eigenen Haus!
+        score += 95; // Fette Prämie für das Eliminieren von Pinky in ihrer Heimat!
       }
     }
   }
-  
+
+  // BRANDNEU: Der Prime-Wall-Bonus (Zusammenhängende Blockaden im eigenen Haus)
+  // Wenn Brain es schafft, 2, 3 oder mehr Punkte am Stück im Haus zu besetzen,
+  // wird Pinky gnadenlos eingemauert.
+  let consecutiveBlocks = 0;
+  for (let i = 18; i <= 23; i++) {
+    if (tempBoard[i] >= 2) {
+      consecutiveBlocks++;
+    } else {
+      if (consecutiveBlocks >= 2) score += consecutiveBlocks * 30;
+      consecutiveBlocks = 0;
+    }
+  }
+  if (consecutiveBlocks >= 2) score += consecutiveBlocks * 30;
+
   return score;
 }
 
+// --- INTELLIGENTE LOOK-AHEAD-SUCHE (VOLLSTÄNDIGE ZUGFOLGEN SIMULIEREN) ---
 function findBestAiMove() {
-  let best = null;
-  let maxScore = -Infinity;
-  const dice = Array.from(new Set(state.dice));
-  const check = (from: number | 'bar', d: number, isOff: boolean) => {
-    const b = [...state.board],
-      bar = { ...state.bar },
-      off = { ...state.off };
-    if (isOff) {
-      b[from as number]--;
-      off.cyan++;
-    } else {
-      const to = from === 'bar' ? d - 1 : (from as number) + d;
-      if (b[to] === -1) {
-        b[to] = 1;
-        bar.magenta++;
-      } else {
-        b[to]++;
+  let bestMove = null;
+  let maxFinalScore = -Infinity;
+
+  // Rekursive Tiefensuche über alle verfügbaren Würfel-Kombinationen
+  function search(
+    currentBoard: number[],
+    currentBar: { cyan: number; magenta: number },
+    currentOff: { cyan: number; magenta: number },
+    remainingDice: number[],
+    moveHistory: any[]
+  ) {
+    // Blattschmuck: Keine Würfel mehr übrig -> Endzustand des Zuges bewerten
+    if (remainingDice.length === 0) {
+      const finalScore = evaluateBoard(currentBoard, currentBar, currentOff);
+      if (finalScore > maxFinalScore) {
+        maxFinalScore = finalScore;
+        bestMove = moveHistory[0] || null; // Wir brauchen den allerersten Teilschritt
       }
-      if (from === 'bar') bar.cyan--;
-      else b[from as number]--;
+      return;
     }
-    const s = evaluateBoard(b, bar, off);
-    if (s > maxScore) {
-      maxScore = s;
-      best = { from, die: d, isOff };
-    }
-  };
-  if (state.bar.cyan > 0) {
-    dice.forEach((d) => {
-      if (canMove('bar', d)) check('bar', d, false);
-    });
-  } else {
-    state.board.forEach((n, i) => {
-      if (n > 0) {
-        dice.forEach((d) => {
-          if (canMoveToOff(i, d)) check(i, d, true);
-          else if (canMove(i, d)) check(i, d, false);
+
+    const uniqueDice = Array.from(new Set(remainingDice));
+    let movedAny = false;
+
+    uniqueDice.forEach((d) => {
+      const nextDice = [...remainingDice];
+      const dieIdx = nextDice.indexOf(d);
+      if (dieIdx !== -1) nextDice.splice(dieIdx, 1);
+
+      const executeSimMove = (from: number | 'bar', isOff: boolean) => {
+        movedAny = true;
+        const nextBoard = [...currentBoard];
+        const nextBar = { ...currentBar };
+        const nextOff = { ...currentOff };
+
+        if (isOff) {
+          nextBoard[from as number]--;
+          nextOff.cyan++;
+        } else {
+          const to = from === 'bar' ? d - 1 : (from as number) + d;
+          if (nextBoard[to] === -1) {
+            nextBoard[to] = 1;
+            nextBar.magenta++;
+          } else {
+            nextBoard[to]++;
+          }
+          if (from === 'bar') nextBar.cyan--;
+          else nextBoard[from as number]--;
+        }
+
+        search(nextBoard, nextBar, nextOff, nextDice, [
+          ...moveHistory,
+          { from, die: d, isOff },
+        ]);
+      };
+
+      // REGEL 1: Bar-Zwang beachten
+      if (currentBar.cyan > 0) {
+        const to = d - 1;
+        if (to >= 0 && to <= 23 && currentBoard[to] >= -1) {
+          executeSimMove('bar', false);
+        }
+      } else {
+        // REGEL 2: Reguläre Züge & Rausspielen
+        let canBearOffNow = true;
+        for (let idx = 0; idx < 24; idx++) {
+          if (currentBoard[idx] > 0 && idx < 18) {
+            canBearOffNow = false;
+            break;
+          }
+        }
+
+        currentBoard.forEach((n, i) => {
+          if (n > 0) {
+            if (canBearOffNow) {
+              const dist = 24 - i;
+              let canOff = false;
+              if (d === dist) canOff = true;
+              else if (d > dist) {
+                let hasFurtherBack = false;
+                for (let p = 18; p < i; p++) {
+                  if (currentBoard[p] > 0) {
+                    hasFurtherBack = true;
+                    break;
+                  }
+                }
+                if (!hasFurtherBack) canOff = true;
+              }
+              if (canOff) {
+                executeSimMove(i, true);
+                return;
+              }
+            }
+
+            const to = i + d;
+            if (to <= 23 && currentBoard[to] >= -1) {
+              executeSimMove(i, false);
+            }
+          }
         });
       }
     });
+
+    // Wenn mit keinem Würfel ein Zug möglich war, bewerten wir das vorzeitige Ende
+    if (!movedAny) {
+      const finalScore = evaluateBoard(currentBoard, currentBar, currentOff);
+      if (finalScore > maxFinalScore) {
+        maxFinalScore = finalScore;
+        bestMove = moveHistory[0] || null;
+      }
+    }
   }
-  return best;
+
+  search(state.board, state.bar, state.off, state.dice, []);
+  return bestMove;
 }
 
 async function playAiTurn() {
@@ -706,11 +770,15 @@ function render() {
   ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'center';
   ctx.shadowBlur = 10;
+  
+  // Cyan Pip-Count
   ctx.fillStyle = CHECKER_CONFIG.cyan;
   ctx.shadowColor = CHECKER_CONFIG.cyan;
   ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
-  ctx.fillStyle = CHECKER_CONFIG.cyan;
-  ctx.shadowColor = CHECKER_CONFIG.cyan;
+  
+  // JETZT KORREKT: Magenta Pip-Count in Magenta!
+  ctx.fillStyle = CHECKER_CONFIG.magenta;
+  ctx.shadowColor = CHECKER_CONFIG.magenta;
   ctx.fillText(
     getPipCount('magenta').toString(),
     barCenterX,
