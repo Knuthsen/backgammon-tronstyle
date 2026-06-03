@@ -6,15 +6,7 @@ import './style.css';
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
-// --- DYNAMISCHE CRT-OVERLAY INJEKTION ---
-const scanlinesDiv = document.createElement('div');
-scanlinesDiv.className = 'crt-scanlines';
-const vignetteDiv = document.createElement('div');
-vignetteDiv.className = 'crt-vignette';
-document.body.appendChild(scanlinesDiv);
-document.body.appendChild(vignetteDiv);
-
-// Das Board-Bild laden
+// Hier ist das Board-Bild wieder sicher verankert!
 const boardImg = new Image();
 boardImg.src = 'TronBoardFAV.jpg';
 
@@ -76,17 +68,18 @@ const animState = {
     y: number;
     color: string;
     pointIdx: number | 'bar' | 'off';
-    alpha?: number;
+    alpha?: number; // Neu: Für Materialisierungs-Fading
   }>,
   dice: [] as Array<{
     value: number;
-    displayValue?: number;
+    displayValue?: number; // Für das Live-Flackern
     x: number;
     y: number;
     alpha: number;
     rotation: number;
     isRolling?: boolean;
   }>,
+  // Neu: Globales Partikelsystem für den Neon-Dematerialisierungseffekt
   particles: [] as Array<{
     x: number;
     y: number;
@@ -175,7 +168,7 @@ function canMoveToOff(from: number, die: number): boolean {
 function animateCheckerMove(
   player: 'cyan' | 'magenta',
   from: number | 'bar',
-  to: number | 'bar'
+  to: number | 'bar' // Typ angepasst, damit 'bar' voll kompatibel ist
 ) {
   let checker;
   if (from === 'bar') {
@@ -201,6 +194,7 @@ function animateCheckerMove(
     tx = pos.x;
     ty = pos.y;
 
+    // --- NEON-DEMATERIALISIERUNGS-EFFEKT ---
     const startX = checker.x;
     const startY = checker.y;
     checker.pointIdx = 'bar';
@@ -208,7 +202,7 @@ function animateCheckerMove(
     const particleCount = 32;
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 45 + 15;
+      const speed = Math.random() * 45 + 15; // Explosionsradius
       const p = {
         x: startX,
         y: startY,
@@ -229,12 +223,14 @@ function animateCheckerMove(
         }
       });
 
+      // Phase 1: Schnelle Explosion nach außen
       tl.to(p, {
         x: burstX,
         y: burstY,
         duration: 0.22,
         ease: 'power2.out'
       })
+      // Phase 2: Einsaugen zur Bar-Zielposition mit leichtem Stagger-Delay
       .to(p, {
         x: tx + (Math.random() - 0.5) * 16,
         y: ty + (Math.random() - 0.5) * 16,
@@ -246,6 +242,7 @@ function animateCheckerMove(
       });
     }
 
+    // Checker sofort unsichtbar schalten, teleportieren und an der Bar materialisieren lassen
     checker.alpha = 0;
     checker.x = tx;
     checker.y = ty;
@@ -253,7 +250,7 @@ function animateCheckerMove(
     gsap.to(checker, {
       alpha: 1,
       duration: 0.45,
-      delay: 0.42,
+      delay: 0.42, // Startet genau dann, wenn die Partikel an der Bar eintreffen
       ease: 'power2.in'
     });
     return;
@@ -742,11 +739,11 @@ function drawChecker(
   isSel: boolean,
   pulse: boolean,
   isHigh = false,
-  alpha = 1
+  alpha = 1 // Neu: Optionale Deckkraft für reibungsloses Fading erhalten
 ) {
   const p = pulse ? Math.sin(Date.now() * 0.007) * 10 : 0;
   ctx.save();
-  ctx.globalAlpha = alpha;
+  ctx.globalAlpha = alpha; // Setzt die globale Deckkraft für diesen Zeichnungsschritt
   
   if (isHigh) {
     const activeColor = CHECKER_CONFIG[state.currentPlayer];
@@ -827,10 +824,11 @@ function render() {
         state.message === '' &&
         c.pointIdx !== 'off',
       false,
-      c.alpha !== undefined ? c.alpha : 1
+      c.alpha !== undefined ? c.alpha : 1 // Nutzt den GSAP-Alphawert, falls vorhanden
     );
   });
 
+  // --- RENDERING DER NEON-PARTIKEL ---
   animState.particles.forEach((p) => {
     ctx.save();
     ctx.globalAlpha = p.alpha;
@@ -1052,7 +1050,7 @@ function initAnimCheckers() {
         y: getLogYForPoint(idx, i, abs),
         color: count > 0 ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta,
         pointIdx: idx,
-        alpha: 1,
+        alpha: 1, // Startet voll sichtbar
       });
     }
   });
