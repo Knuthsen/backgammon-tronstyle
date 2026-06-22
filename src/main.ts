@@ -57,18 +57,34 @@ const state = {
   gameEnded: false,
   isProcessing: false,
   validTargets: [] as number[],
-  isOpeningRoll: true, // Flag für das Auswürfeln des Startspielers
+  isOpeningRoll: true,
+  scores: {
+    magenta: [0, 0, 0], // Ziffern für das aktuelle Spiel
+    cyan: [0, 0, 0],
+  },
+  matchScores: {
+    magenta: 0,         // Gesamtsumme der gewonnenen Spiele
+    cyan: 0,
+  },
+  // NEU: Match-Steuerungssystem
+  mode: 'menu' as 'menu' | 'single' | 'match',
+  matchEnded: false,
+  currentGameNumber: { magenta: 0, cyan: 0 }
 };
 
-// Startaufstellung
-state.board[0] = 2;
-state.board[11] = 5;
-state.board[18] = 5;
-state.board[16] = 3;
-state.board[23] = -2;
-state.board[12] = -5;
-state.board[5] = -5;
-state.board[7] = -3;
+// Startaufstellung setzen
+function setupInitialBoard() {
+  state.board = Array(24).fill(0);
+  state.board[0] = 2;
+  state.board[11] = 5;
+  state.board[18] = 5;
+  state.board[16] = 3;
+  state.board[23] = -2;
+  state.board[12] = -5;
+  state.board[5] = -5;
+  state.board[7] = -3;
+}
+setupInitialBoard();
 
 const animState = {
   checkers: [] as Array<{
@@ -97,6 +113,34 @@ const animState = {
     shadowBlur: number;
   }>,
 };
+
+// --- NEU: RESET FUNKTIONEN FÜR MATCHES ---
+function resetGameForNextRound() {
+  setupInitialBoard();
+  state.dice = [];
+  state.currentPlayer = 'magenta';
+  state.selectedPoint = null;
+  state.bar = { cyan: 0, magenta: 0 };
+  state.off = { cyan: 0, magenta: 0 };
+  state.message = 'WÜRFELN UM START';
+  state.gameEnded = false;
+  state.isProcessing = false;
+  state.validTargets = [];
+  state.isOpeningRoll = true;
+
+  animState.dice = [];
+  animState.particles = [];
+  initAnimCheckers();
+}
+
+function resetAllToMenu() {
+  state.mode = 'menu';
+  state.matchEnded = false;
+  state.scores = { magenta: [0, 0, 0], cyan: [0, 0, 0] };
+  state.matchScores = { magenta: 0, cyan: 0 };
+  state.currentGameNumber = { magenta: 0, cyan: 0 };
+  resetGameForNextRound();
+}
 
 // --- HILFSFUNKTIONEN ---
 const getLogXForPoint = (idx: number) => {
@@ -379,17 +423,33 @@ function executeBearOff(from: number, die: number) {
       points = hasCheckersInWinnersHomeOrBar ? 3 : 2;
     }
 
-    if (points === 1) {
-      state.message = `${winnerName} GEWINNT`;
-    } else if (points === 2) {
-      state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
-    } else {
-      state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
-    }
-
     state.dice = [];
     animState.dice = [];
     state.gameEnded = true;
+
+    // --- NEU: ERWEITERTE MATCH- UND SCOREBOARD-LOGIK ---
+    if (state.mode === 'match') {
+      const currentBoxIdx = state.currentGameNumber[p];
+      if (currentBoxIdx < 3) {
+        state.scores[p][currentBoxIdx] = points;
+        state.currentGameNumber[p]++;
+      }
+      state.matchScores[p] += points;
+
+      if (state.matchScores[p] >= 3) {
+        state.matchEnded = true;
+        state.message = `${winnerName} BEHERRSCHT DIE WELT!`;
+      } else {
+        if (points === 1) state.message = `${winnerName} GEWINNT DIE RUNDE`;
+        else if (points === 2) state.message = `${winnerName} DOMINIERT DIE RUNDE!`;
+        else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
+      }
+    } else {
+      // Klassische Einzelspiel-Nachrichten
+      if (points === 1) state.message = `${winnerName} GEWINNT`;
+      else if (points === 2) state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
+      else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
+    }
     return;
   }
   
@@ -738,7 +798,6 @@ async function playAiTurn() {
   if (state.currentPlayer !== 'cyan' || state.isProcessing) return;
   state.isProcessing = true;
 
-  // Wenn wir bereits Würfel haben (vom Eröffnungswurf), überspringen wir das Würfeln
   if (state.dice.length === 0) {
     await delay(800);
     const r1 = Math.floor(Math.random() * 6) + 1,
@@ -747,7 +806,6 @@ async function playAiTurn() {
     animateDiceShake();
     await delay(1200);
   } else {
-    // Kurze Denkpause für die KI, damit der Spieler sieht, wer startet
     await delay(1500);
   }
 
@@ -824,11 +882,99 @@ function drawChecker(
   ctx.restore();
 }
 
+function drawScoreBox(x: number, y: number, width: number, height: number, color: string, value: number) {
+  ctx.save();
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+  
+  ctx.beginPath();
+  ctx.roundRect(x, y - height / 2, width, height, 4);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.font = 'bold 18px monospace';
+  ctx.fillStyle = '#fff';
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(value === 0 ? '' : value.toString(), x + width / 2, y); // Leere Boxen schöner darstellen
+  ctx.restore();
+}
+
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (boardImg.complete) ctx.drawImage(boardImg, 0, 0);
   const boardMid = boardImg.height / 2;
 
+  // --- NEU: MODUS-MENÜ OVERLAY ---
+  if (state.mode === 'menu') {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const mX = canvas.width / 2;
+    const mY = canvas.height / 2;
+
+    ctx.save();
+    ctx.font = 'bold 38px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00f2ff';
+    ctx.fillText('TRON BACKGAMMON', mX, mY - 110);
+
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = '#888';
+    ctx.shadowBlur = 0;
+    ctx.fillText('WÄHLE DEN SPIELMODUS', mX, mY - 65);
+    ctx.restore();
+
+    // Box: Einzelspiel
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeStyle = CHECKER_CONFIG.magenta;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = CHECKER_CONFIG.magenta;
+    ctx.beginPath();
+    ctx.roundRect(mX - 260, mY - 20, 240, 55, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EINZELSPIEL', mX - 140, mY + 7);
+    ctx.restore();
+
+    // Box: Match bis 3 Punkte
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeStyle = CHECKER_CONFIG.cyan;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = CHECKER_CONFIG.cyan;
+    ctx.beginPath();
+    ctx.roundRect(mX + 20, mY - 20, 240, 55, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = 'bold 15px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('MATCH BIS 3 PUNKTE', mX + 140, mY + 7);
+    ctx.restore();
+
+    requestAnimationFrame(render);
+    return;
+  }
+
+  // --- SPIELFELD-RENDERING ---
   state.validTargets.forEach((idx) => {
     const y =
       idx < 12
@@ -898,6 +1044,70 @@ function render() {
   );
   ctx.restore();
 
+  // --- SCOREBOARD ANZEIGE (NUR IM MATCH MODUS) ---
+  if (state.mode === 'match') {
+    const SCORE_CONFIG = { 
+      y1: 645,            
+      y2: 690,            
+      boxWidth: 24, 
+      boxHeight: 32, 
+      boxGap: 6 
+    };
+    
+    // === ZEILE 1: AKTUELLES SPIEL ===
+    // Pinky (Magenta)
+    ctx.save();
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = CHECKER_CONFIG.magenta;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = CHECKER_CONFIG.magenta;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PINKY', 201, SCORE_CONFIG.y1);
+    ctx.restore();
+    
+    state.scores.magenta.forEach((val, idx) => {
+      const boxX = 281 + idx * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
+      drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.magenta, val);
+    });
+    
+    // Brain (Cyan)
+    ctx.save();
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = CHECKER_CONFIG.cyan;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = CHECKER_CONFIG.cyan;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('BRAIN', 606, SCORE_CONFIG.y1);
+    ctx.restore();
+    
+    state.scores.cyan.forEach((val, idx) => {
+      const boxX = 442 + idx * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
+      drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, val);
+    });
+
+    // === ZEILE 2: MATCH-SCORE ===
+    const centerIq = 404; 
+    
+    ctx.save();
+    ctx.font = 'bold 16px monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('MATCH-SCORE', centerIq, SCORE_CONFIG.y2);
+    ctx.restore();
+    
+    const pinkyMatchX = 281;
+    drawScoreBox(pinkyMatchX, SCORE_CONFIG.y2 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.magenta, state.matchScores.magenta);
+    
+    const brainMatchX = 442 + 2 * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
+    drawScoreBox(brainMatchX, SCORE_CONFIG.y2 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, state.matchScores.cyan);
+  }
+
+  // --- WÜRFELZUSTAND / INTERAKTIONSFLÄCHEN ---
   if (!state.gameEnded) {
     if (
       state.dice.length === 0 &&
@@ -912,7 +1122,6 @@ function render() {
         ctx.save();
         ctx.shadowBlur = 12 + pulse;
         
-        // Beim Eröffnungswurf leuchtet der obere Slot Cyan (Brain) und der untere Magenta (Pinky)
         let outlineColor = CHECKER_CONFIG.magenta;
         if (state.isOpeningRoll) {
           outlineColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
@@ -941,8 +1150,10 @@ function render() {
       }
     }
   } else {
+    // --- SPIELENDE SCHALTFLÄCHEN (DYNAMISCH) ---
     const x = barCenterX,
       y = boardMid + GRID.diceYOffset + 45;
+    
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     ctx.strokeStyle = '#fff';
@@ -950,18 +1161,33 @@ function render() {
     ctx.shadowBlur = 15;
     ctx.shadowColor = '#fff';
     ctx.beginPath();
-    ctx.roundRect(x - 70, y - 20, 140, 40, 10);
+
+    let btnText = 'NEUES SPIEL';
+    let btnWidth = 140;
+
+    if (state.mode === 'match') {
+      if (state.matchEnded) {
+        btnText = 'NOCH MAL SPIELEN?';
+        btnWidth = 200;
+      } else {
+        btnText = 'NÄCHSTES SPIEL';
+        btnWidth = 160;
+      }
+    }
+    
+    ctx.roundRect(x - btnWidth / 2, y - 20, btnWidth, 40, 10);
     ctx.fill();
     ctx.stroke();
 
-    ctx.font = 'bold 16px monospace';
+    ctx.font = 'bold 15px monospace';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('NEUES SPIEL', x, y);
+    ctx.fillText(btnText, x, y);
     ctx.restore();
   }
 
+  // --- RENDERE GEWÜRFELTE WÜRFEL ---
   animState.dice.forEach((d, i) => {
     ctx.save();
     ctx.translate(d.x + 22, d.y + 22);
@@ -971,7 +1197,6 @@ function render() {
     
     ctx.shadowBlur = d.isRolling ? 25 : 15;
     
-    // Farbanpassung für Würfel: Im Eröffnungs-Modus ist der obere (i=0) Cyan, der untere Magenta
     let diceColor = CHECKER_CONFIG[state.currentPlayer];
     if (state.isOpeningRoll || state.message.includes('BEGINNT')) {
       diceColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
@@ -995,20 +1220,21 @@ function render() {
     ctx.restore();
   });
 
+  // --- STATUSTEXT / BENACHRICHTIGUNGSBOX ---
   if (state.message !== '') {
     ctx.save();
     let color = CHECKER_CONFIG[state.currentPlayer] || '#fff';
-    // Box-Farbe beim Eröffnungswurf neutral halten
     if (state.isOpeningRoll && !state.message.includes('PASCH')) color = '#fff';
+    if (state.matchEnded) color = '#fff'; // Galaktisches Weiß für den finalen Herrscher
     
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(canvas.width / 2 - 230, boardMid + 60, 460, 60, 12);
+    ctx.roundRect(canvas.width / 2 - 250, boardMid + 60, 500, 60, 12);
     ctx.fill();
     ctx.stroke();
-    ctx.font = 'bold 22px monospace';
+    ctx.font = 'bold 20px monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#fff';
     ctx.shadowBlur = 15;
@@ -1026,18 +1252,51 @@ function handleInteraction(clientX: number, clientY: number) {
   const y = (clientY - rect.top) * (canvas.height / rect.height);
   const boardMid = boardImg.height / 2;
 
+  // --- Klicks im Modus-Menü abfangen ---
+  if (state.mode === 'menu') {
+    const mX = canvas.width / 2;
+    const mY = canvas.height / 2;
+
+    // Klick auf „EINZELSPIEL“
+    if (x >= mX - 260 && x <= mX - 20 && y >= mY - 20 && y <= mY + 35) {
+      state.mode = 'single';
+      resetGameForNextRound();
+    }
+    // Klick auf „MATCH BIS 3 PUNKTE“
+    else if (x >= mX + 20 && x <= mX + 260 && y >= mY - 20 && y <= mY + 35) {
+      state.mode = 'match';
+      resetGameForNextRound();
+    }
+    return;
+  }
+
+  // --- Klicks bei Runden- / Match-Ende abfangen ---
   if (state.gameEnded) {
     const buttonX = barCenterX;
     const buttonY = boardMid + GRID.diceYOffset + 45;
-    if (Math.abs(x - buttonX) < 70 && Math.abs(y - buttonY) < 20) {
-      location.reload();
+    
+    let btnWidth = 140;
+    if (state.mode === 'match') {
+      btnWidth = state.matchEnded ? 200 : 160;
+    }
+
+    if (Math.abs(x - buttonX) < btnWidth / 2 && Math.abs(y - buttonY) < 20) {
+      if (state.mode === 'single') {
+        resetAllToMenu(); // Nach einem Einzelspiel zurück zum Hauptmenü
+      } else {
+        if (state.matchEnded) {
+          resetAllToMenu(); // Match komplett vorbei -> zurück zum Menü
+        } else {
+          resetGameForNextRound(); // Nächste Runde im Match starten
+        }
+      }
     }
     return;
   }
 
   if (state.isProcessing) return;
 
-  // WÜRFELN-TRIGGERN
+  // Würfeln auslösen
   if (
     Math.abs(x - barCenterX) < 40 &&
     state.dice.length === 0 &&
@@ -1050,7 +1309,7 @@ function handleInteraction(clientX: number, clientY: number) {
     state.isProcessing = true;
 
     if (state.isOpeningRoll) {
-      state.dice = [r1, r2]; // r1 = Oben (Brain), r2 = Unten (Pinky)
+      state.dice = [r1, r2];
       animateDiceShake(() => {
         if (r1 === r2) {
           state.message = 'PASCH! ERNEUT WÜRFELN';
@@ -1070,16 +1329,15 @@ function handleInteraction(clientX: number, clientY: number) {
             state.message = '';
             state.isProcessing = false;
             if (state.currentPlayer === 'cyan') {
-              playAiTurn(); // KI startet direkt mit dem Wurf
+              playAiTurn();
             } else {
-              checkGameState(); // Spieler startet direkt mit dem Wurf
+              checkGameState();
             }
           }, 2000);
         }
       });
     } else {
-      // Normaler Spielzug-Wurf
-      if (state.currentPlayer === 'cyan') return; // Mensch darf nicht für KI würfeln
+      if (state.currentPlayer === 'cyan') return;
       state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
       animateDiceShake(() => {
         state.isProcessing = false;
@@ -1089,16 +1347,17 @@ function handleInteraction(clientX: number, clientY: number) {
     return;
   }
 
-  // Wenn der Eröffnungswurf läuft oder die KI am Zug ist, sind Checker-Klicks gesperrt
   if (state.isOpeningRoll || state.currentPlayer === 'cyan') return;
   if (state.dice.length === 0) return;
 
+  // Bar-Interaktion
   if (Math.abs(x - barCenterX) < 40 && state.bar.magenta > 0) {
     state.selectedPoint = state.selectedPoint === 'bar' ? null : 'bar';
     updateValidTargets();
     return;
   }
 
+  // Point-Interaktion
   for (let i = 0; i < 24; i++) {
     if (Math.abs(x - getLogXForPoint(i)) < 40) {
       if ((y < boardMid && i >= 12) || (y > boardMid && i < 12)) {
