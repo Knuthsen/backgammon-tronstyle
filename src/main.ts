@@ -53,10 +53,11 @@ const state = {
   selectedPoint: null as number | null | 'bar',
   bar: { cyan: 0, magenta: 0 },
   off: { cyan: 0, magenta: 0 },
-  message: '' as string,
+  message: 'WÜRFELN UM START' as string,
   gameEnded: false,
   isProcessing: false,
   validTargets: [] as number[],
+  isOpeningRoll: true, // Flag für das Auswürfeln des Startspielers
 };
 
 // Startaufstellung
@@ -360,20 +361,15 @@ function executeBearOff(from: number, die: number) {
     const loserKey = p === 'magenta' ? 'cyan' : 'magenta';
     let points = 1;
 
-    // Hat der Verlierer noch überhaupt keinen Stein abgetragen?
     if (state.off[loserKey] === 0) {
       let hasCheckersInWinnersHomeOrBar = false;
 
       if (p === 'cyan') {
-        // BRAIN (Cyan) gewinnt. Heimfeld von Cyan ist 18-23.
-        // Hat PINKY (Magenta, negative Zahlen) noch Steine auf der Bar oder in Cyans Heimfeld?
         const hasInHome = state.board.slice(18, 24).some(n => n < 0);
         if (state.bar.magenta > 0 || hasInHome) {
           hasCheckersInWinnersHomeOrBar = true;
         }
       } else {
-        // PINKY (Magenta) gewinnt. Heimfeld von Magenta ist 0-5.
-        // Hat BRAIN (Cyan, positive Zahlen) noch Steine auf der Bar oder in Pinkys Heimfeld?
         const hasInHome = state.board.slice(0, 6).some(n => n > 0);
         if (state.bar.cyan > 0 || hasInHome) {
           hasCheckersInWinnersHomeOrBar = true;
@@ -383,7 +379,6 @@ function executeBearOff(from: number, die: number) {
       points = hasCheckersInWinnersHomeOrBar ? 3 : 2;
     }
 
-    // Siegertext setzen basierend auf der Gewinnstufe
     if (points === 1) {
       state.message = `${winnerName} GEWINNT`;
     } else if (points === 2) {
@@ -743,13 +738,18 @@ async function playAiTurn() {
   if (state.currentPlayer !== 'cyan' || state.isProcessing) return;
   state.isProcessing = true;
 
-  await delay(800);
-  const r1 = Math.floor(Math.random() * 6) + 1,
-    r2 = Math.floor(Math.random() * 6) + 1;
-  state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
-  animateDiceShake();
-
-  await delay(1200);
+  // Wenn wir bereits Würfel haben (vom Eröffnungswurf), überspringen wir das Würfeln
+  if (state.dice.length === 0) {
+    await delay(800);
+    const r1 = Math.floor(Math.random() * 6) + 1,
+      r2 = Math.floor(Math.random() * 6) + 1;
+    state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
+    animateDiceShake();
+    await delay(1200);
+  } else {
+    // Kurze Denkpause für die KI, damit der Spieler sieht, wer startet
+    await delay(1500);
+  }
 
   while (state.dice.length > 0) {
     const move = findBestAiMove();
@@ -858,7 +858,8 @@ function render() {
       c.y,
       c.color,
       isSel,
-      state.currentPlayer ===
+      !state.isOpeningRoll &&
+        state.currentPlayer ===
         (c.color === CHECKER_CONFIG.cyan ? 'cyan' : 'magenta') &&
         state.message === '' &&
         c.pointIdx !== 'off',
@@ -900,8 +901,6 @@ function render() {
   if (!state.gameEnded) {
     if (
       state.dice.length === 0 &&
-      state.message === '' &&
-      state.currentPlayer === 'magenta' &&
       !state.isProcessing
     ) {
       const logX = barCenterX - 22;
@@ -912,8 +911,17 @@ function render() {
         const y = baseLogY + i * 55;
         ctx.save();
         ctx.shadowBlur = 12 + pulse;
-        ctx.shadowColor = CHECKER_CONFIG.magenta;
-        ctx.strokeStyle = CHECKER_CONFIG.magenta;
+        
+        // Beim Eröffnungswurf leuchtet der obere Slot Cyan (Brain) und der untere Magenta (Pinky)
+        let outlineColor = CHECKER_CONFIG.magenta;
+        if (state.isOpeningRoll) {
+          outlineColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
+        } else if (state.currentPlayer === 'cyan') {
+          outlineColor = CHECKER_CONFIG.cyan;
+        }
+        
+        ctx.shadowColor = outlineColor;
+        ctx.strokeStyle = outlineColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         
@@ -954,7 +962,7 @@ function render() {
     ctx.restore();
   }
 
-  animState.dice.forEach((d) => {
+  animState.dice.forEach((d, i) => {
     ctx.save();
     ctx.translate(d.x + 22, d.y + 22);
     ctx.rotate((d.rotation * Math.PI) / 180);
@@ -962,8 +970,15 @@ function render() {
     ctx.globalAlpha = d.alpha;
     
     ctx.shadowBlur = d.isRolling ? 25 : 15;
-    ctx.shadowColor = CHECKER_CONFIG[state.currentPlayer];
-    ctx.strokeStyle = CHECKER_CONFIG[state.currentPlayer];
+    
+    // Farbanpassung für Würfel: Im Eröffnungs-Modus ist der obere (i=0) Cyan, der untere Magenta
+    let diceColor = CHECKER_CONFIG[state.currentPlayer];
+    if (state.isOpeningRoll || state.message.includes('BEGINNT')) {
+      diceColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
+    }
+    
+    ctx.shadowColor = diceColor;
+    ctx.strokeStyle = diceColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(0, 0, 44, 44, 8);
@@ -982,7 +997,10 @@ function render() {
 
   if (state.message !== '') {
     ctx.save();
-    const color = CHECKER_CONFIG[state.currentPlayer] || '#fff';
+    let color = CHECKER_CONFIG[state.currentPlayer] || '#fff';
+    // Box-Farbe beim Eröffnungswurf neutral halten
+    if (state.isOpeningRoll && !state.message.includes('PASCH')) color = '#fff';
+    
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -1017,8 +1035,9 @@ function handleInteraction(clientX: number, clientY: number) {
     return;
   }
 
-  if (state.isProcessing || state.currentPlayer === 'cyan') return;
+  if (state.isProcessing) return;
 
+  // WÜRFELN-TRIGGERN
   if (
     Math.abs(x - barCenterX) < 40 &&
     state.dice.length === 0 &&
@@ -1027,16 +1046,51 @@ function handleInteraction(clientX: number, clientY: number) {
   ) {
     const r1 = Math.floor(Math.random() * 6) + 1,
       r2 = Math.floor(Math.random() * 6) + 1;
-    state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
     
     state.isProcessing = true;
-    animateDiceShake(() => {
-      state.isProcessing = false;
-      checkGameState();
-    });
+
+    if (state.isOpeningRoll) {
+      state.dice = [r1, r2]; // r1 = Oben (Brain), r2 = Unten (Pinky)
+      animateDiceShake(() => {
+        if (r1 === r2) {
+          state.message = 'PASCH! ERNEUT WÜRFELN';
+          setTimeout(() => {
+            state.dice = [];
+            animState.dice = [];
+            state.message = 'WÜRFELN UM START';
+            state.isProcessing = false;
+          }, 2000);
+        } else {
+          state.isOpeningRoll = false;
+          state.currentPlayer = r1 > r2 ? 'cyan' : 'magenta';
+          const winnerName = state.currentPlayer === 'magenta' ? 'PINKY' : 'BRAIN';
+          state.message = `${winnerName} BEGINNT!`;
+          
+          setTimeout(() => {
+            state.message = '';
+            state.isProcessing = false;
+            if (state.currentPlayer === 'cyan') {
+              playAiTurn(); // KI startet direkt mit dem Wurf
+            } else {
+              checkGameState(); // Spieler startet direkt mit dem Wurf
+            }
+          }, 2000);
+        }
+      });
+    } else {
+      // Normaler Spielzug-Wurf
+      if (state.currentPlayer === 'cyan') return; // Mensch darf nicht für KI würfeln
+      state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
+      animateDiceShake(() => {
+        state.isProcessing = false;
+        checkGameState();
+      });
+    }
     return;
   }
 
+  // Wenn der Eröffnungswurf läuft oder die KI am Zug ist, sind Checker-Klicks gesperrt
+  if (state.isOpeningRoll || state.currentPlayer === 'cyan') return;
   if (state.dice.length === 0) return;
 
   if (Math.abs(x - barCenterX) < 40 && state.bar.magenta > 0) {
