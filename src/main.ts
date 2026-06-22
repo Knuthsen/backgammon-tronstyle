@@ -354,14 +354,50 @@ function executeBearOff(from: number, die: number) {
   if (dIdx !== -1) animState.dice.splice(dIdx, 1);
   state.selectedPoint = null;
   state.validTargets = [];
+  
   if (state.off[p] === 15) {
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
-    state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
+    const loserKey = p === 'magenta' ? 'cyan' : 'magenta';
+    let points = 1;
+
+    // Hat der Verlierer noch überhaupt keinen Stein abgetragen?
+    if (state.off[loserKey] === 0) {
+      let hasCheckersInWinnersHomeOrBar = false;
+
+      if (p === 'cyan') {
+        // BRAIN (Cyan) gewinnt. Heimfeld von Cyan ist 18-23.
+        // Hat PINKY (Magenta, negative Zahlen) noch Steine auf der Bar oder in Cyans Heimfeld?
+        const hasInHome = state.board.slice(18, 24).some(n => n < 0);
+        if (state.bar.magenta > 0 || hasInHome) {
+          hasCheckersInWinnersHomeOrBar = true;
+        }
+      } else {
+        // PINKY (Magenta) gewinnt. Heimfeld von Magenta ist 0-5.
+        // Hat BRAIN (Cyan, positive Zahlen) noch Steine auf der Bar oder in Pinkys Heimfeld?
+        const hasInHome = state.board.slice(0, 6).some(n => n > 0);
+        if (state.bar.cyan > 0 || hasInHome) {
+          hasCheckersInWinnersHomeOrBar = true;
+        }
+      }
+
+      points = hasCheckersInWinnersHomeOrBar ? 3 : 2;
+    }
+
+    // Siegertext setzen basierend auf der Gewinnstufe
+    if (points === 1) {
+      state.message = `${winnerName} GEWINNT`;
+    } else if (points === 2) {
+      state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
+    } else {
+      state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
+    }
+
     state.dice = [];
     animState.dice = [];
     state.gameEnded = true;
     return;
   }
+  
   if (!state.isProcessing) checkGameState();
 }
 
@@ -1062,12 +1098,10 @@ function resizeGame() {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
   if (!canvas) return;
   
-  // Nutzt die exakt verfügbaren Pixel des Viewports
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
   canvas.style.objectFit = 'fill';
   
-  // Zwingt Safari, die Adressleiste im Querformat sauber zu handhaben
   window.scrollTo(0, 0);
 }
 
