@@ -49,7 +49,7 @@ const OFF_CONFIG = {
 const state = {
   board: Array(24).fill(0),
   dice: [] as number[],
-  currentPlayer: 'magenta' as 'cyan' | 'magenta',
+  currentPlayer: 'magenta' as 'cyan' | 'magenta', 
   selectedPoint: null as number | null | 'bar',
   bar: { cyan: 0, magenta: 0 },
   off: { cyan: 0, magenta: 0 },
@@ -57,19 +57,29 @@ const state = {
   gameEnded: false,
   isProcessing: false,
   validTargets: [] as number[],
+  doubleMoveTarget: null as number | null, // Trackt das kombinierte Summenfeld
   isOpeningRoll: true,
   scores: {
-    magenta: [0, 0, 0], // Ziffern für das aktuelle Spiel
+    magenta: [0, 0, 0], 
     cyan: [0, 0, 0],
   },
   matchScores: {
-    magenta: 0,         // Gesamtsumme der gewonnenen Spiele
+    magenta: 0,         
     cyan: 0,
   },
-  // NEU: Match-Steuerungssystem
   mode: 'menu' as 'menu' | 'single' | 'match',
   matchEnded: false,
   currentGameNumber: { magenta: 0, cyan: 0 }
+};
+
+// --- GSAP ANIMATION STATE FÜR DEN STARTSCREEN ---
+const menuAnimState = {
+  titleOpacity: 0,
+  titleGlow: 0,
+  btnOpacity: 0,
+  btnYOffset: 80,
+  gridOpacity: 0,
+  gridScroll: 0
 };
 
 // Startaufstellung setzen
@@ -114,7 +124,44 @@ const animState = {
   }>,
 };
 
-// --- NEU: RESET FUNKTIONEN FÜR MATCHES ---
+// --- GSAP INTRO ANIMATION TRIGGER ---
+function animateStartScreen() {
+  menuAnimState.titleOpacity = 0;
+  menuAnimState.titleGlow = 0;
+  menuAnimState.btnOpacity = 0;
+  menuAnimState.btnYOffset = 80;
+  menuAnimState.gridOpacity = 0;
+
+  const tl = gsap.timeline();
+
+  tl.to(menuAnimState, {
+    gridOpacity: 0.35,
+    duration: 1.4,
+    ease: 'power2.out'
+  }, 0);
+
+  tl.to(menuAnimState, {
+    titleOpacity: 1,
+    titleGlow: 25,
+    duration: 0.6,
+    ease: 'power4.inOut',
+    keyframes: [
+      { titleOpacity: 0.2, titleGlow: 4, duration: 0.05 },
+      { titleOpacity: 0.8, titleGlow: 18, duration: 0.05 },
+      { titleOpacity: 0.1, titleGlow: 2, duration: 0.04 },
+      { titleOpacity: 1, titleGlow: 25, duration: 0.2 }
+    ]
+  }, 0.2);
+
+  tl.to(menuAnimState, {
+    btnOpacity: 1,
+    btnYOffset: 0,
+    duration: 0.85,
+    ease: 'back.out(1.5)'
+  }, '-=0.15');
+}
+
+// --- RESET FUNKTIONEN FÜR MATCHES ---
 function resetGameForNextRound() {
   setupInitialBoard();
   state.dice = [];
@@ -126,6 +173,7 @@ function resetGameForNextRound() {
   state.gameEnded = false;
   state.isProcessing = false;
   state.validTargets = [];
+  state.doubleMoveTarget = null;
   state.isOpeningRoll = true;
 
   animState.dice = [];
@@ -140,6 +188,7 @@ function resetAllToMenu() {
   state.matchScores = { magenta: 0, cyan: 0 };
   state.currentGameNumber = { magenta: 0, cyan: 0 };
   resetGameForNextRound();
+  animateStartScreen();
 }
 
 // --- HILFSFUNKTIONEN ---
@@ -399,6 +448,7 @@ function executeBearOff(from: number, die: number) {
   if (dIdx !== -1) animState.dice.splice(dIdx, 1);
   state.selectedPoint = null;
   state.validTargets = [];
+  state.doubleMoveTarget = null;
   
   if (state.off[p] === 15) {
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
@@ -427,7 +477,6 @@ function executeBearOff(from: number, die: number) {
     animState.dice = [];
     state.gameEnded = true;
 
-    // --- NEU: ERWEITERTE MATCH- UND SCOREBOARD-LOGIK ---
     if (state.mode === 'match') {
       const currentBoxIdx = state.currentGameNumber[p];
       if (currentBoxIdx < 3) {
@@ -445,7 +494,6 @@ function executeBearOff(from: number, die: number) {
         else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
       }
     } else {
-      // Klassische Einzelspiel-Nachrichten
       if (points === 1) state.message = `${winnerName} GEWINNT`;
       else if (points === 2) state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
       else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
@@ -478,6 +526,67 @@ function handleMove(to: number) {
           ? -1
           : 24
         : (state.selectedPoint as number);
+
+    // --- LOGIK FÜR ERWEITERTEN DOUBLE MOVE (PINKY / MAGENTA) ---
+    if (state.currentPlayer === 'magenta' && state.dice.length >= 2) {
+      const d1 = state.dice[0];
+      const d2 = state.dice[1];
+      const totalDist = fromIdx - to;
+
+      if (totalDist === d1 + d2) {
+        let inter1 = fromIdx - d1;
+        let pathAValid = canMove(state.selectedPoint, d1) && inter1 >= 0 && inter1 <= 23 && canMove(inter1, d2) && state.board[inter1] !== 1;
+        
+        let inter2 = fromIdx - d2;
+        let pathBValid = d1 !== d2 && canMove(state.selectedPoint, d2) && inter2 >= 0 && inter2 <= 23 && canMove(inter2, d1) && state.board[inter2] !== 1;
+
+        if (pathAValid || pathBValid) {
+          let firstDie = pathAValid ? d1 : d2;
+          let secondDie = pathAValid ? d2 : d1;
+          let interPoint = pathAValid ? inter1 : inter2;
+
+          state.isProcessing = true;
+          const s = -1;
+
+          animateCheckerMove('magenta', state.selectedPoint, interPoint);
+          if (state.selectedPoint === 'bar') {
+            state.bar.magenta--;
+          } else {
+            state.board[state.selectedPoint as number] -= s;
+          }
+          state.board[interPoint] += s;
+          state.dice.splice(state.dice.indexOf(firstDie), 1);
+          
+          const adIdx1 = animState.dice.findIndex((d) => d.value === firstDie && d.alpha === 1);
+          if (adIdx1 !== -1) animState.dice.splice(adIdx1, 1);
+
+          state.selectedPoint = null;
+          state.validTargets = [];
+          state.doubleMoveTarget = null;
+
+          setTimeout(() => {
+            if (state.board[to] === 1) {
+              animateCheckerMove('cyan', to, 'bar');
+              state.board[to] = 0;
+              state.bar.cyan++;
+            }
+
+            animateCheckerMove('magenta', interPoint, to);
+            state.board[interPoint] -= s;
+            state.board[to] += s;
+            state.dice.splice(state.dice.indexOf(secondDie), 1);
+
+            const adIdx2 = animState.dice.findIndex((d) => d.value === secondDie && d.alpha === 1);
+            if (adIdx2 !== -1) animState.dice.splice(adIdx2, 1);
+
+            state.isProcessing = false;
+            checkGameState();
+          }, 600);
+          return;
+        }
+      }
+    }
+
     const dist = state.currentPlayer === 'cyan' ? to - fromIdx : fromIdx - to;
     const dIdx = state.dice.indexOf(dist);
     if (dIdx !== -1 && canMove(state.selectedPoint, dist)) {
@@ -507,10 +616,12 @@ function handleMove(to: number) {
       if (adIdx !== -1) animState.dice.splice(adIdx, 1);
       state.selectedPoint = null;
       state.validTargets = [];
+      state.doubleMoveTarget = null;
       if (!state.isProcessing) checkGameState();
     } else {
       state.selectedPoint = null;
       state.validTargets = [];
+      state.doubleMoveTarget = null;
     }
   }
 }
@@ -532,7 +643,10 @@ function canMove(from: number | 'bar', die: number): boolean {
 
 function updateValidTargets() {
   state.validTargets = [];
+  state.doubleMoveTarget = null; // Neu initialisieren
   if (state.selectedPoint === null) return;
+  
+  // 1. Standard Single-Moves ermitteln
   Array.from(new Set(state.dice)).forEach((d) => {
     if (canMove(state.selectedPoint!, d)) {
       const isC = state.currentPlayer === 'cyan';
@@ -547,6 +661,43 @@ function updateValidTargets() {
       if (!state.validTargets.includes(to)) state.validTargets.push(to);
     }
   });
+
+  // 2. Kombinierte Double-Moves für Pinky (magenta) berechnen
+  if (state.currentPlayer === 'magenta' && state.dice.length >= 2) {
+    let fromIdx = state.selectedPoint === 'bar' ? 24 : (state.selectedPoint as number);
+    let d1 = state.dice[0];
+    let d2 = state.dice[1];
+
+    let inter1 = fromIdx - d1;
+    let pathAValid = false;
+    if (canMove(state.selectedPoint!, d1) && inter1 >= 0 && inter1 <= 23) {
+      if (canMove(inter1, d2)) {
+        if (state.board[inter1] !== 1) {
+          pathAValid = true;
+        }
+      }
+    }
+
+    let inter2 = fromIdx - d2;
+    let pathBValid = false;
+    if (d1 !== d2 && canMove(state.selectedPoint!, d2) && inter2 >= 0 && inter2 <= 23) {
+      if (canMove(inter2, d1)) {
+        if (state.board[inter2] !== 1) {
+          pathBValid = true;
+        }
+      }
+    }
+
+    if (pathAValid || pathBValid) {
+      let targetSum = fromIdx - (d1 + d2);
+      if (targetSum >= 0 && targetSum <= 23) {
+        if (!state.validTargets.includes(targetSum)) {
+          state.validTargets.push(targetSum);
+          state.doubleMoveTarget = targetSum; // Feld als Double-Move-Ziel markieren
+        }
+      }
+    }
+  }
 }
 
 function checkGameState() {
@@ -836,7 +987,8 @@ function drawChecker(
   isSel: boolean,
   pulse: boolean,
   isHigh = false,
-  alpha = 1
+  alpha = 1,
+  isDouble = false // Optionale Double-Move Kennzeichnung
 ) {
   const p = pulse ? Math.sin(Date.now() * 0.007) * 10 : 0;
   ctx.save();
@@ -845,7 +997,7 @@ function drawChecker(
   if (isHigh) {
     const activeColor = CHECKER_CONFIG[state.currentPlayer];
     ctx.shadowBlur = 25;
-    ctx.shadowColor = activeColor;
+    ctx.shadowColor = isDouble ? '#ffffff' : activeColor; // Weißer Glow für Double Moves
     
     ctx.fillStyle = activeColor;
     ctx.globalAlpha = 0.35 * alpha;
@@ -853,9 +1005,16 @@ function drawChecker(
     ctx.arc(x, y, 17, 0, Math.PI * 2);
     ctx.fill();
     
-    ctx.strokeStyle = activeColor;
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.7 * alpha;
+    // Zusätzlicher weißer Core-Schimmer bei Double-Moves
+    if (isDouble) {
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.25 * alpha;
+      ctx.fill();
+    }
+    
+    ctx.strokeStyle = isDouble ? '#ffffff' : activeColor; // Weißer Rand
+    ctx.lineWidth = isDouble ? 4 : 3;
+    ctx.globalAlpha = 0.8 * alpha;
     ctx.stroke();
     
     ctx.restore();
@@ -901,7 +1060,51 @@ function drawScoreBox(x: number, y: number, width: number, height: number, color
   ctx.shadowColor = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(value === 0 ? '' : value.toString(), x + width / 2, y); // Leere Boxen schöner darstellen
+  ctx.fillText(value === 0 ? '' : value.toString(), x + width / 2, y); 
+  ctx.restore();
+}
+
+function drawMenuGrid() {
+  if (menuAnimState.gridOpacity <= 0) return;
+  ctx.save();
+
+  const mX = canvas.width / 2;
+  const horizonY = canvas.height / 2 - 30;
+
+  menuAnimState.gridScroll += 0.6;
+  if (menuAnimState.gridScroll >= 40) {
+    menuAnimState.gridScroll = 0;
+  }
+
+  ctx.lineWidth = 1.5;
+
+  for (let i = 0; i < 16; i++) {
+    const ratio = i / 15;
+    const lineY = horizonY + Math.pow(ratio, 2.4) * (canvas.height - horizonY) + menuAnimState.gridScroll * ratio;
+    
+    if (lineY > canvas.height) continue;
+
+    ctx.globalAlpha = menuAnimState.gridOpacity * ratio;
+    ctx.strokeStyle = '#ff00ff';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ff00ff';
+
+    ctx.beginPath();
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(canvas.width, lineY);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = menuAnimState.gridOpacity * 0.4;
+  const totalRays = 26;
+  for (let i = 0; i <= totalRays; i++) {
+    const xBottom = (canvas.width / totalRays) * i;
+    ctx.beginPath();
+    ctx.moveTo(mX + (xBottom - mX) * 0.08, horizonY);
+    ctx.lineTo(xBottom, canvas.height);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -910,37 +1113,35 @@ function render() {
   if (boardImg.complete) ctx.drawImage(boardImg, 0, 0);
   const boardMid = boardImg.height / 2;
 
-  // --- NEU: MODUS-MENÜ OVERLAY ---
   if (state.mode === 'menu') {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawMenuGrid();
 
     const mX = canvas.width / 2;
     const mY = canvas.height / 2;
 
     ctx.save();
-    ctx.font = 'bold 38px monospace';
+    ctx.globalAlpha = menuAnimState.titleOpacity;
+    ctx.font = 'bold 44px monospace';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
-    ctx.shadowBlur = 20;
+    ctx.shadowBlur = menuAnimState.titleGlow;
     ctx.shadowColor = '#00f2ff';
-    ctx.fillText('TRON BACKGAMMON', mX, mY - 110);
-
-    ctx.font = 'bold 16px monospace';
-    ctx.fillStyle = '#888';
-    ctx.shadowBlur = 0;
-    ctx.fillText('WÄHLE DEN SPIELMODUS', mX, mY - 65);
+    ctx.fillText('BACKGAMMON', mX, mY - 110);
     ctx.restore();
 
-    // Box: Einzelspiel
     ctx.save();
+    ctx.globalAlpha = menuAnimState.btnOpacity;
     ctx.lineWidth = 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.strokeStyle = CHECKER_CONFIG.magenta;
     ctx.shadowBlur = 15;
     ctx.shadowColor = CHECKER_CONFIG.magenta;
     ctx.beginPath();
-    ctx.roundRect(mX - 260, mY - 20, 240, 55, 8);
+    const btn1Y = mY - 20 + menuAnimState.btnYOffset;
+    ctx.roundRect(mX - 260, btn1Y, 240, 55, 8);
     ctx.fill();
     ctx.stroke();
 
@@ -948,18 +1149,19 @@ function render() {
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('EINZELSPIEL', mX - 140, mY + 7);
+    ctx.fillText('EINZELSPIEL', mX - 140, btn1Y + 27);
     ctx.restore();
 
-    // Box: Match bis 3 Punkte
     ctx.save();
+    ctx.globalAlpha = menuAnimState.btnOpacity;
     ctx.lineWidth = 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.strokeStyle = CHECKER_CONFIG.cyan;
     ctx.shadowBlur = 15;
     ctx.shadowColor = CHECKER_CONFIG.cyan;
     ctx.beginPath();
-    ctx.roundRect(mX + 20, mY - 20, 240, 55, 8);
+    const btn2Y = mY - 20 + menuAnimState.btnYOffset;
+    ctx.roundRect(mX + 20, btn2Y, 240, 55, 8);
     ctx.fill();
     ctx.stroke();
 
@@ -967,20 +1169,22 @@ function render() {
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('MATCH BIS 3 PUNKTE', mX + 140, mY + 7);
+    ctx.fillText('MATCH BIS 3 PUNKTE', mX + 140, btn2Y + 27);
     ctx.restore();
 
     requestAnimationFrame(render);
     return;
   }
 
-  // --- SPIELFELD-RENDERING ---
+  // Highlights für valide Felder zeichnen
   state.validTargets.forEach((idx) => {
     const y =
       idx < 12
         ? GRID.bottomY - Math.abs(state.board[idx]) * GRID.stackOffset
         : GRID.topY + Math.abs(state.board[idx]) * GRID.stackOffset;
-    drawChecker(getLogXForPoint(idx), y, '#fff', false, false, true);
+        
+    const isDouble = (idx === state.doubleMoveTarget); // Prüfen, ob Feld das Summenfeld ist
+    drawChecker(getLogXForPoint(idx), y, '#fff', false, false, true, 1, isDouble);
   });
 
   const sorted = [...animState.checkers].sort((a, b) => {
@@ -1044,7 +1248,6 @@ function render() {
   );
   ctx.restore();
 
-  // --- SCOREBOARD ANZEIGE (NUR IM MATCH MODUS) ---
   if (state.mode === 'match') {
     const SCORE_CONFIG = { 
       y1: 645,            
@@ -1054,8 +1257,6 @@ function render() {
       boxGap: 6 
     };
     
-    // === ZEILE 1: AKTUELLES SPIEL ===
-    // Pinky (Magenta)
     ctx.save();
     ctx.font = 'bold 20px monospace';
     ctx.fillStyle = CHECKER_CONFIG.magenta;
@@ -1071,7 +1272,6 @@ function render() {
       drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.magenta, val);
     });
     
-    // Brain (Cyan)
     ctx.save();
     ctx.font = 'bold 20px monospace';
     ctx.fillStyle = CHECKER_CONFIG.cyan;
@@ -1087,7 +1287,6 @@ function render() {
       drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, val);
     });
 
-    // === ZEILE 2: MATCH-SCORE ===
     const centerIq = 404; 
     
     ctx.save();
@@ -1107,7 +1306,6 @@ function render() {
     drawScoreBox(brainMatchX, SCORE_CONFIG.y2 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, state.matchScores.cyan);
   }
 
-  // --- WÜRFELZUSTAND / INTERAKTIONSFLÄCHEN ---
   if (!state.gameEnded) {
     if (
       state.dice.length === 0 &&
@@ -1150,7 +1348,6 @@ function render() {
       }
     }
   } else {
-    // --- SPIELENDE SCHALTFLÄCHEN (DYNAMISCH) ---
     const x = barCenterX,
       y = boardMid + GRID.diceYOffset + 45;
     
@@ -1187,7 +1384,6 @@ function render() {
     ctx.restore();
   }
 
-  // --- RENDERE GEWÜRFELTE WÜRFEL ---
   animState.dice.forEach((d, i) => {
     ctx.save();
     ctx.translate(d.x + 22, d.y + 22);
@@ -1220,12 +1416,11 @@ function render() {
     ctx.restore();
   });
 
-  // --- STATUSTEXT / BENACHRICHTIGUNGSBOX ---
   if (state.message !== '') {
     ctx.save();
     let color = CHECKER_CONFIG[state.currentPlayer] || '#fff';
     if (state.isOpeningRoll && !state.message.includes('PASCH')) color = '#fff';
-    if (state.matchEnded) color = '#fff'; // Galaktisches Weiß für den finalen Herrscher
+    if (state.matchEnded) color = '#fff'; 
     
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.strokeStyle = color;
@@ -1252,17 +1447,14 @@ function handleInteraction(clientX: number, clientY: number) {
   const y = (clientY - rect.top) * (canvas.height / rect.height);
   const boardMid = boardImg.height / 2;
 
-  // --- Klicks im Modus-Menü abfangen ---
   if (state.mode === 'menu') {
     const mX = canvas.width / 2;
     const mY = canvas.height / 2;
 
-    // Klick auf „EINZELSPIEL“
     if (x >= mX - 260 && x <= mX - 20 && y >= mY - 20 && y <= mY + 35) {
       state.mode = 'single';
       resetGameForNextRound();
     }
-    // Klick auf „MATCH BIS 3 PUNKTE“
     else if (x >= mX + 20 && x <= mX + 260 && y >= mY - 20 && y <= mY + 35) {
       state.mode = 'match';
       resetGameForNextRound();
@@ -1270,7 +1462,6 @@ function handleInteraction(clientX: number, clientY: number) {
     return;
   }
 
-  // --- Klicks bei Runden- / Match-Ende abfangen ---
   if (state.gameEnded) {
     const buttonX = barCenterX;
     const buttonY = boardMid + GRID.diceYOffset + 45;
@@ -1282,12 +1473,12 @@ function handleInteraction(clientX: number, clientY: number) {
 
     if (Math.abs(x - buttonX) < btnWidth / 2 && Math.abs(y - buttonY) < 20) {
       if (state.mode === 'single') {
-        resetAllToMenu(); // Nach einem Einzelspiel zurück zum Hauptmenü
+        resetAllToMenu();
       } else {
         if (state.matchEnded) {
-          resetAllToMenu(); // Match komplett vorbei -> zurück zum Menü
+          resetAllToMenu();
         } else {
-          resetGameForNextRound(); // Nächste Runde im Match starten
+          resetGameForNextRound();
         }
       }
     }
@@ -1296,7 +1487,6 @@ function handleInteraction(clientX: number, clientY: number) {
 
   if (state.isProcessing) return;
 
-  // Würfeln auslösen
   if (
     Math.abs(x - barCenterX) < 40 &&
     state.dice.length === 0 &&
@@ -1350,14 +1540,12 @@ function handleInteraction(clientX: number, clientY: number) {
   if (state.isOpeningRoll || state.currentPlayer === 'cyan') return;
   if (state.dice.length === 0) return;
 
-  // Bar-Interaktion
   if (Math.abs(x - barCenterX) < 40 && state.bar.magenta > 0) {
     state.selectedPoint = state.selectedPoint === 'bar' ? null : 'bar';
     updateValidTargets();
     return;
   }
 
-  // Point-Interaktion
   for (let i = 0; i < 24; i++) {
     if (Math.abs(x - getLogXForPoint(i)) < 40) {
       if ((y < boardMid && i >= 12) || (y > boardMid && i < 12)) {
@@ -1424,6 +1612,7 @@ boardImg.onload = () => {
   resizeGame();
   initAnimCheckers();
   render();
+  animateStartScreen();
 };
 
 window.addEventListener('resize', resizeGame);
