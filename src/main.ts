@@ -535,54 +535,65 @@ function handleMove(to: number) {
 
       if (totalDist === d1 + d2) {
         let inter1 = fromIdx - d1;
-        let pathAValid = canMove(state.selectedPoint, d1) && inter1 >= 0 && inter1 <= 23 && canMove(inter1, d2) && state.board[inter1] !== 1;
-        
         let inter2 = fromIdx - d2;
-        let pathBValid = d1 !== d2 && canMove(state.selectedPoint, d2) && inter2 >= 0 && inter2 <= 23 && canMove(inter2, d1) && state.board[inter2] !== 1;
 
-        if (pathAValid || pathBValid) {
-          let firstDie = pathAValid ? d1 : d2;
-          let secondDie = pathAValid ? d2 : d1;
-          let interPoint = pathAValid ? inter1 : inter2;
+        // Absoluter Vorab-Check auf schlagbare Blots auf beiden potenziellen Zwischenfeldern
+        let hitsOnFirstStep = false;
+        if (inter1 >= 0 && inter1 <= 23 && state.board[inter1] === 1) {
+          hitsOnFirstStep = true;
+        }
+        if (d1 !== d2 && inter2 >= 0 && inter2 <= 23 && state.board[inter2] === 1) {
+          hitsOnFirstStep = true;
+        }
 
-          state.isProcessing = true;
-          const s = -1;
+        if (!hitsOnFirstStep) {
+          let pathAValid = canMove(state.selectedPoint, d1) && inter1 >= 0 && inter1 <= 23 && canMove(inter1, d2);
+          let pathBValid = d1 !== d2 && canMove(state.selectedPoint, d2) && inter2 >= 0 && inter2 <= 23 && canMove(inter2, d1);
 
-          animateCheckerMove('magenta', state.selectedPoint, interPoint);
-          if (state.selectedPoint === 'bar') {
-            state.bar.magenta--;
-          } else {
-            state.board[state.selectedPoint as number] -= s;
-          }
-          state.board[interPoint] += s;
-          state.dice.splice(state.dice.indexOf(firstDie), 1);
-          
-          const adIdx1 = animState.dice.findIndex((d) => d.value === firstDie && d.alpha === 1);
-          if (adIdx1 !== -1) animState.dice.splice(adIdx1, 1);
+          if (pathAValid || pathBValid) {
+            let firstDie = pathAValid ? d1 : d2;
+            let secondDie = pathAValid ? d2 : d1;
+            let interPoint = pathAValid ? inter1 : inter2;
 
-          state.selectedPoint = null;
-          state.validTargets = [];
-          state.doubleMoveTarget = null;
+            state.isProcessing = true;
+            const s = -1;
 
-          setTimeout(() => {
-            if (state.board[to] === 1) {
-              animateCheckerMove('cyan', to, 'bar');
-              state.board[to] = 0;
-              state.bar.cyan++;
+            animateCheckerMove('magenta', state.selectedPoint, interPoint);
+            if (state.selectedPoint === 'bar') {
+              state.bar.magenta--;
+            } else {
+              state.board[state.selectedPoint as number] -= s;
             }
+            state.board[interPoint] += s;
+            state.dice.splice(state.dice.indexOf(firstDie), 1);
+            
+            const adIdx1 = animState.dice.findIndex((d) => d.value === firstDie && d.alpha === 1);
+            if (adIdx1 !== -1) animState.dice.splice(adIdx1, 1);
 
-            animateCheckerMove('magenta', interPoint, to);
-            state.board[interPoint] -= s;
-            state.board[to] += s;
-            state.dice.splice(state.dice.indexOf(secondDie), 1);
+            state.selectedPoint = null;
+            state.validTargets = [];
+            state.doubleMoveTarget = null;
 
-            const adIdx2 = animState.dice.findIndex((d) => d.value === secondDie && d.alpha === 1);
-            if (adIdx2 !== -1) animState.dice.splice(adIdx2, 1);
+            setTimeout(() => {
+              if (state.board[to] === 1) {
+                animateCheckerMove('cyan', to, 'bar');
+                state.board[to] = 0;
+                state.bar.cyan++;
+              }
 
-            state.isProcessing = false;
-            checkGameState();
-          }, 600);
-          return;
+              animateCheckerMove('magenta', interPoint, to);
+              state.board[interPoint] -= s;
+              state.board[to] += s;
+              state.dice.splice(state.dice.indexOf(secondDie), 1);
+
+              const adIdx2 = animState.dice.findIndex((d) => d.value === secondDie && d.alpha === 1);
+              if (adIdx2 !== -1) animState.dice.splice(adIdx2, 1);
+
+              state.isProcessing = false;
+              checkGameState();
+            }, 600);
+            return;
+          }
         }
       }
     }
@@ -669,31 +680,39 @@ function updateValidTargets() {
     let d2 = state.dice[1];
 
     let inter1 = fromIdx - d1;
-    let pathAValid = false;
-    if (canMove(state.selectedPoint!, d1) && inter1 >= 0 && inter1 <= 23) {
-      if (canMove(inter1, d2)) {
-        if (state.board[inter1] !== 1) {
+    let inter2 = fromIdx - d2;
+
+    // Absoluter Ausschluss: Falls irgendein erster Teilschritt einen gegnerischen Blot (Wert 1) schlägt, Double-Move komplett sperren
+    let hitsOnFirstStep = false;
+    if (inter1 >= 0 && inter1 <= 23 && state.board[inter1] === 1) {
+      hitsOnFirstStep = true;
+    }
+    if (d1 !== d2 && inter2 >= 0 && inter2 <= 23 && state.board[inter2] === 1) {
+      hitsOnFirstStep = true;
+    }
+
+    if (!hitsOnFirstStep) {
+      let pathAValid = false;
+      if (canMove(state.selectedPoint!, d1) && inter1 >= 0 && inter1 <= 23) {
+        if (canMove(inter1, d2)) {
           pathAValid = true;
         }
       }
-    }
 
-    let inter2 = fromIdx - d2;
-    let pathBValid = false;
-    if (d1 !== d2 && canMove(state.selectedPoint!, d2) && inter2 >= 0 && inter2 <= 23) {
-      if (canMove(inter2, d1)) {
-        if (state.board[inter2] !== 1) {
+      let pathBValid = false;
+      if (d1 !== d2 && canMove(state.selectedPoint!, d2) && inter2 >= 0 && inter2 <= 23) {
+        if (canMove(inter2, d1)) {
           pathBValid = true;
         }
       }
-    }
 
-    if (pathAValid || pathBValid) {
-      let targetSum = fromIdx - (d1 + d2);
-      if (targetSum >= 0 && targetSum <= 23) {
-        if (!state.validTargets.includes(targetSum)) {
-          state.validTargets.push(targetSum);
-          state.doubleMoveTarget = targetSum; // Feld als Double-Move-Ziel markieren
+      if (pathAValid || pathBValid) {
+        let targetSum = fromIdx - (d1 + d2);
+        if (targetSum >= 0 && targetSum <= 23) {
+          if (!state.validTargets.includes(targetSum)) {
+            state.validTargets.push(targetSum);
+            state.doubleMoveTarget = targetSum; // Feld als Double-Move-Ziel markieren
+          }
         }
       }
     }
