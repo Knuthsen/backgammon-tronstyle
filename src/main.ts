@@ -14,9 +14,8 @@ vignetteDiv.className = 'crt-vignette';
 document.body.appendChild(scanlinesDiv);
 document.body.appendChild(vignetteDiv);
 
-// Das Board-Bild laden
+// Das Board-Bild instanziieren (Quelle wird ganz unten zugewiesen!)
 const boardImg = new Image();
-boardImg.src = 'TronBoardFAV.jpg';
 
 // --- KONFIGURATION ---
 const GRID = {
@@ -1258,7 +1257,7 @@ function render() {
   ctx.shadowColor = CHECKER_CONFIG.cyan;
   ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
   
-  ctx.fillStyle = CHECKER_CONFIG.magenta;
+  ctx.fillStyle = '#ffffff';
   ctx.shadowColor = CHECKER_CONFIG.magenta;
   ctx.fillText(
     getPipCount('magenta').toString(),
@@ -1625,6 +1624,7 @@ function resizeGame() {
   window.scrollTo(0, 0);
 }
 
+// --- BILD-HANDLER UND TRIGERUNG ---
 boardImg.onload = () => {
   canvas.width = boardImg.width;
   canvas.height = boardImg.height;
@@ -1633,6 +1633,13 @@ boardImg.onload = () => {
   render();
   animateStartScreen();
 };
+
+boardImg.onerror = (err) => {
+  console.error("Fehler beim Laden von 'TronBoardFAV.jpg'. Pfad prüfen!", err);
+};
+
+// ERST JETZT die Source zuweisen, damit die Handler bei schnellem Cache-Load greifen!
+boardImg.src = 'TronBoardFAV.jpg';
 
 window.addEventListener('resize', resizeGame);
 window.addEventListener('orientationchange', resizeGame);
