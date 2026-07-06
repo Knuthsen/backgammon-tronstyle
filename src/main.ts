@@ -48,7 +48,7 @@ const OFF_CONFIG = {
 const state = {
   board: Array(24).fill(0),
   dice: [] as number[],
-  currentPlayer: 'magenta' as 'cyan' | 'magenta', 
+  currentPlayer: 'magenta' as 'cyan' | 'magenta',
   selectedPoint: null as number | null | 'bar',
   bar: { cyan: 0, magenta: 0 },
   off: { cyan: 0, magenta: 0 },
@@ -59,16 +59,16 @@ const state = {
   doubleMoveTarget: null as number | null, // Trackt das kombinierte Summenfeld
   isOpeningRoll: true,
   scores: {
-    magenta: [0, 0, 0], 
+    magenta: [0, 0, 0],
     cyan: [0, 0, 0],
   },
   matchScores: {
-    magenta: 0,         
+    magenta: 0,
     cyan: 0,
   },
   mode: 'menu' as 'menu' | 'single' | 'match',
   matchEnded: false,
-  currentGameNumber: { magenta: 0, cyan: 0 }
+  currentGameNumber: { magenta: 0, cyan: 0 },
 };
 
 // --- GSAP ANIMATION STATE FÜR DEN STARTSCREEN ---
@@ -78,7 +78,7 @@ const menuAnimState = {
   btnOpacity: 0,
   btnYOffset: 80,
   gridOpacity: 0,
-  gridScroll: 0
+  gridScroll: 0,
 };
 
 // Startaufstellung setzen
@@ -133,31 +133,43 @@ function animateStartScreen() {
 
   const tl = gsap.timeline();
 
-  tl.to(menuAnimState, {
-    gridOpacity: 0.35,
-    duration: 1.4,
-    ease: 'power2.out'
-  }, 0);
+  tl.to(
+    menuAnimState,
+    {
+      gridOpacity: 0.35,
+      duration: 1.4,
+      ease: 'power2.out',
+    },
+    0
+  );
 
-  tl.to(menuAnimState, {
-    titleOpacity: 1,
-    titleGlow: 25,
-    duration: 0.6,
-    ease: 'power4.inOut',
-    keyframes: [
-      { titleOpacity: 0.2, titleGlow: 4, duration: 0.05 },
-      { titleOpacity: 0.8, titleGlow: 18, duration: 0.05 },
-      { titleOpacity: 0.1, titleGlow: 2, duration: 0.04 },
-      { titleOpacity: 1, titleGlow: 25, duration: 0.2 }
-    ]
-  }, 0.2);
+  tl.to(
+    menuAnimState,
+    {
+      titleOpacity: 1,
+      titleGlow: 25,
+      duration: 0.6,
+      ease: 'power4.inOut',
+      keyframes: [
+        { titleOpacity: 0.2, titleGlow: 4, duration: 0.05 },
+        { titleOpacity: 0.8, titleGlow: 18, duration: 0.05 },
+        { titleOpacity: 0.1, titleGlow: 2, duration: 0.04 },
+        { titleOpacity: 1, titleGlow: 25, duration: 0.2 },
+      ],
+    },
+    0.2
+  );
 
-  tl.to(menuAnimState, {
-    btnOpacity: 1,
-    btnYOffset: 0,
-    duration: 0.85,
-    ease: 'back.out(1.5)'
-  }, '-=0.15');
+  tl.to(
+    menuAnimState,
+    {
+      btnOpacity: 1,
+      btnYOffset: 0,
+      duration: 0.85,
+      ease: 'back.out(1.5)',
+    },
+    '-=0.15'
+  );
 }
 
 // --- RESET FUNKTIONEN FÜR MATCHES ---
@@ -308,7 +320,7 @@ function animateCheckerMove(
         alpha: 1,
         size: Math.random() * 3 + 1.5,
         color: checker.color,
-        shadowBlur: 10
+        shadowBlur: 10,
       };
       animState.particles.push(p);
 
@@ -319,23 +331,22 @@ function animateCheckerMove(
         onComplete: () => {
           const pIdx = animState.particles.indexOf(p);
           if (pIdx !== -1) animState.particles.splice(pIdx, 1);
-        }
+        },
       });
 
       tl.to(p, {
         x: burstX,
         y: burstY,
         duration: 0.22,
-        ease: 'power2.out'
-      })
-      .to(p, {
+        ease: 'power2.out',
+      }).to(p, {
         x: tx + (Math.random() - 0.5) * 16,
         y: ty + (Math.random() - 0.5) * 16,
         alpha: 0,
         size: 0.5,
         duration: 0.58,
         ease: 'power1.in',
-        delay: Math.random() * 0.06
+        delay: Math.random() * 0.06,
       });
     }
 
@@ -347,7 +358,7 @@ function animateCheckerMove(
       alpha: 1,
       duration: 0.45,
       delay: 0.42,
-      ease: 'power2.in'
+      ease: 'power2.in',
     });
     return;
   } else {
@@ -358,7 +369,7 @@ function animateCheckerMove(
       Math.abs(state.board[to]) + 1
     );
   }
-  
+
   checker.pointIdx = to;
   gsap.to(checker, { x: tx, y: ty, duration: 0.55, ease: 'power2.out' });
 }
@@ -408,7 +419,7 @@ function animateDiceShake(onCompleteCallback?: () => void) {
       y: logY,
       alpha: 0,
       rotation: (Math.random() - 0.5) * 720,
-      isRolling: true
+      isRolling: true,
     };
     animState.dice.push(die);
 
@@ -430,7 +441,7 @@ function animateDiceShake(onCompleteCallback?: () => void) {
         if (completedCount === state.dice.length && onCompleteCallback) {
           onCompleteCallback();
         }
-      }
+      },
     });
   });
 }
@@ -448,7 +459,7 @@ function executeBearOff(from: number, die: number) {
   state.selectedPoint = null;
   state.validTargets = [];
   state.doubleMoveTarget = null;
-  
+
   if (state.off[p] === 15) {
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
     const loserKey = p === 'magenta' ? 'cyan' : 'magenta';
@@ -458,12 +469,12 @@ function executeBearOff(from: number, die: number) {
       let hasCheckersInWinnersHomeOrBar = false;
 
       if (p === 'cyan') {
-        const hasInHome = state.board.slice(18, 24).some(n => n < 0);
+        const hasInHome = state.board.slice(18, 24).some((n) => n < 0);
         if (state.bar.magenta > 0 || hasInHome) {
           hasCheckersInWinnersHomeOrBar = true;
         }
       } else {
-        const hasInHome = state.board.slice(0, 6).some(n => n > 0);
+        const hasInHome = state.board.slice(0, 6).some((n) => n > 0);
         if (state.bar.cyan > 0 || hasInHome) {
           hasCheckersInWinnersHomeOrBar = true;
         }
@@ -489,17 +500,19 @@ function executeBearOff(from: number, die: number) {
         state.message = `${winnerName} BEHERRSCHT DIE WELT!`;
       } else {
         if (points === 1) state.message = `${winnerName} GEWINNT DIE RUNDE`;
-        else if (points === 2) state.message = `${winnerName} DOMINIERT DIE RUNDE!`;
+        else if (points === 2)
+          state.message = `${winnerName} DOMINIERT DIE RUNDE!`;
         else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
       }
     } else {
       if (points === 1) state.message = `${winnerName} GEWINNT`;
-      else if (points === 2) state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
+      else if (points === 2)
+        state.message = `${winnerName} DOMINIERT DAS SPIEL!`;
       else state.message = `${winnerName} HOLT DIE WELTHERRSCHAFT!`;
     }
     return;
   }
-  
+
   if (!state.isProcessing) checkGameState();
 }
 
@@ -541,13 +554,27 @@ function handleMove(to: number) {
         if (inter1 >= 0 && inter1 <= 23 && state.board[inter1] === 1) {
           hitsOnFirstStep = true;
         }
-        if (d1 !== d2 && inter2 >= 0 && inter2 <= 23 && state.board[inter2] === 1) {
+        if (
+          d1 !== d2 &&
+          inter2 >= 0 &&
+          inter2 <= 23 &&
+          state.board[inter2] === 1
+        ) {
           hitsOnFirstStep = true;
         }
 
         if (!hitsOnFirstStep) {
-          let pathAValid = canMove(state.selectedPoint, d1) && inter1 >= 0 && inter1 <= 23 && canMove(inter1, d2);
-          let pathBValid = d1 !== d2 && canMove(state.selectedPoint, d2) && inter2 >= 0 && inter2 <= 23 && canMove(inter2, d1);
+          let pathAValid =
+            canMove(state.selectedPoint, d1) &&
+            inter1 >= 0 &&
+            inter1 <= 23 &&
+            canMove(inter1, d2);
+          let pathBValid =
+            d1 !== d2 &&
+            canMove(state.selectedPoint, d2) &&
+            inter2 >= 0 &&
+            inter2 <= 23 &&
+            canMove(inter2, d1);
 
           if (pathAValid || pathBValid) {
             let firstDie = pathAValid ? d1 : d2;
@@ -565,8 +592,10 @@ function handleMove(to: number) {
             }
             state.board[interPoint] += s;
             state.dice.splice(state.dice.indexOf(firstDie), 1);
-            
-            const adIdx1 = animState.dice.findIndex((d) => d.value === firstDie && d.alpha === 1);
+
+            const adIdx1 = animState.dice.findIndex(
+              (d) => d.value === firstDie && d.alpha === 1
+            );
             if (adIdx1 !== -1) animState.dice.splice(adIdx1, 1);
 
             state.selectedPoint = null;
@@ -585,7 +614,9 @@ function handleMove(to: number) {
               state.board[to] += s;
               state.dice.splice(state.dice.indexOf(secondDie), 1);
 
-              const adIdx2 = animState.dice.findIndex((d) => d.value === secondDie && d.alpha === 1);
+              const adIdx2 = animState.dice.findIndex(
+                (d) => d.value === secondDie && d.alpha === 1
+              );
               if (adIdx2 !== -1) animState.dice.splice(adIdx2, 1);
 
               state.isProcessing = false;
@@ -655,7 +686,7 @@ function updateValidTargets() {
   state.validTargets = [];
   state.doubleMoveTarget = null; // Neu initialisieren
   if (state.selectedPoint === null) return;
-  
+
   // 1. Standard Single-Moves ermitteln
   Array.from(new Set(state.dice)).forEach((d) => {
     if (canMove(state.selectedPoint!, d)) {
@@ -673,8 +704,14 @@ function updateValidTargets() {
   });
 
   // 2. Kombinierte Double-Moves für Pinky (magenta) berechnen
-  if (state.currentPlayer === 'magenta' && state.dice.length >= 2) {
-    let fromIdx = state.selectedPoint === 'bar' ? 24 : (state.selectedPoint as number);
+  // FIX: Block wird sofort ignoriert, wenn Pinky von der Bar zieht, dort aber MEHR ALS EIN Stein liegt!
+  if (
+    state.currentPlayer === 'magenta' &&
+    state.dice.length >= 2 &&
+    !(state.selectedPoint === 'bar' && state.bar.magenta > 1)
+  ) {
+    let fromIdx =
+      state.selectedPoint === 'bar' ? 24 : (state.selectedPoint as number);
     let d1 = state.dice[0];
     let d2 = state.dice[1];
 
@@ -699,7 +736,12 @@ function updateValidTargets() {
       }
 
       let pathBValid = false;
-      if (d1 !== d2 && canMove(state.selectedPoint!, d2) && inter2 >= 0 && inter2 <= 23) {
+      if (
+        d1 !== d2 &&
+        canMove(state.selectedPoint!, d2) &&
+        inter2 >= 0 &&
+        inter2 <= 23
+      ) {
         if (canMove(inter2, d1)) {
           pathBValid = true;
         }
@@ -753,11 +795,25 @@ function checkGameState() {
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 const HIT_PROBABILITIES: { [key: number]: number } = {
-  1: 11, 2: 12, 3: 14, 4: 15, 5: 15, 6: 17,
-  7: 6, 8: 6, 9: 5, 10: 3, 11: 2, 12: 3,
+  1: 11,
+  2: 12,
+  3: 14,
+  4: 15,
+  5: 15,
+  6: 17,
+  7: 6,
+  8: 6,
+  9: 5,
+  10: 3,
+  11: 2,
+  12: 3,
 };
 
-function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: number): number {
+function getHitDanger(
+  fromIdx: number,
+  tempBoard: number[],
+  tempBarMagenta: number
+): number {
   let totalDanger = 0;
   for (let pinkyIdx = fromIdx + 1; pinkyIdx < 24; pinkyIdx++) {
     if (tempBoard[pinkyIdx] < 0) {
@@ -765,9 +821,13 @@ function getHitDanger(fromIdx: number, tempBoard: number[], tempBarMagenta: numb
       if (distance <= 12) {
         let prob = HIT_PROBABILITIES[distance] || 0;
         if (distance > 6) {
-          for (let checkBlock = pinkyIdx - 1; checkBlock > fromIdx; checkBlock--) {
+          for (
+            let checkBlock = pinkyIdx - 1;
+            checkBlock > fromIdx;
+            checkBlock--
+          ) {
             if (tempBoard[checkBlock] >= 2) {
-              prob *= 0.3; 
+              prob *= 0.3;
               break;
             }
           }
@@ -1011,30 +1071,30 @@ function drawChecker(
   const p = pulse ? Math.sin(Date.now() * 0.007) * 10 : 0;
   ctx.save();
   ctx.globalAlpha = alpha;
-  
+
   if (isHigh) {
     const activeColor = CHECKER_CONFIG[state.currentPlayer];
     ctx.shadowBlur = 25;
     ctx.shadowColor = isDouble ? '#ffffff' : activeColor; // Weißer Glow für Double Moves
-    
+
     ctx.fillStyle = activeColor;
     ctx.globalAlpha = 0.35 * alpha;
     ctx.beginPath();
     ctx.arc(x, y, 17, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Zusätzlicher weißer Core-Schimmer bei Double-Moves
     if (isDouble) {
       ctx.fillStyle = '#ffffff';
       ctx.globalAlpha = 0.25 * alpha;
       ctx.fill();
     }
-    
+
     ctx.strokeStyle = isDouble ? '#ffffff' : activeColor; // Weißer Rand
     ctx.lineWidth = isDouble ? 4 : 3;
     ctx.globalAlpha = 0.8 * alpha;
     ctx.stroke();
-    
+
     ctx.restore();
     return;
   }
@@ -1047,7 +1107,7 @@ function drawChecker(
   ctx.beginPath();
   ctx.arc(x, y, 17, 0, Math.PI * 2);
   ctx.stroke();
-  
+
   ctx.fillStyle = 'rgba(0,0,0,0.85)';
   ctx.fill();
   ctx.beginPath();
@@ -1055,30 +1115,37 @@ function drawChecker(
   ctx.strokeStyle = isSel ? '#fff' : color;
   ctx.lineWidth = 2;
   ctx.stroke();
-  
+
   ctx.restore();
 }
 
-function drawScoreBox(x: number, y: number, width: number, height: number, color: string, value: number) {
+function drawScoreBox(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  color: string,
+  value: number
+) {
   ctx.save();
   ctx.shadowBlur = 8;
   ctx.shadowColor = color;
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-  
+
   ctx.beginPath();
   ctx.roundRect(x, y - height / 2, width, height, 4);
   ctx.fill();
   ctx.stroke();
-  
+
   ctx.font = 'bold 18px monospace';
   ctx.fillStyle = '#fff';
   ctx.shadowBlur = 10;
   ctx.shadowColor = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(value === 0 ? '' : value.toString(), x + width / 2, y); 
+  ctx.fillText(value === 0 ? '' : value.toString(), x + width / 2, y);
   ctx.restore();
 }
 
@@ -1098,8 +1165,11 @@ function drawMenuGrid() {
 
   for (let i = 0; i < 16; i++) {
     const ratio = i / 15;
-    const lineY = horizonY + Math.pow(ratio, 2.4) * (canvas.height - horizonY) + menuAnimState.gridScroll * ratio;
-    
+    const lineY =
+      horizonY +
+      Math.pow(ratio, 2.4) * (canvas.height - horizonY) +
+      menuAnimState.gridScroll * ratio;
+
     if (lineY > canvas.height) continue;
 
     ctx.globalAlpha = menuAnimState.gridOpacity * ratio;
@@ -1132,7 +1202,7 @@ function render() {
   const boardMid = boardImg.height / 2;
 
   if (state.mode === 'menu') {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'; 
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     drawMenuGrid();
@@ -1200,9 +1270,18 @@ function render() {
       idx < 12
         ? GRID.bottomY - Math.abs(state.board[idx]) * GRID.stackOffset
         : GRID.topY + Math.abs(state.board[idx]) * GRID.stackOffset;
-        
-    const isDouble = (idx === state.doubleMoveTarget); // Prüfen, ob Feld das Summenfeld ist
-    drawChecker(getLogXForPoint(idx), y, '#fff', false, false, true, 1, isDouble);
+
+    const isDouble = idx === state.doubleMoveTarget; // Prüfen, ob Feld das Summenfeld ist
+    drawChecker(
+      getLogXForPoint(idx),
+      y,
+      '#fff',
+      false,
+      false,
+      true,
+      1,
+      isDouble
+    );
   });
 
   const sorted = [...animState.checkers].sort((a, b) => {
@@ -1228,7 +1307,7 @@ function render() {
       isSel,
       !state.isOpeningRoll &&
         state.currentPlayer ===
-        (c.color === CHECKER_CONFIG.cyan ? 'cyan' : 'magenta') &&
+          (c.color === CHECKER_CONFIG.cyan ? 'cyan' : 'magenta') &&
         state.message === '' &&
         c.pointIdx !== 'off',
       false,
@@ -1252,11 +1331,11 @@ function render() {
   ctx.font = 'bold 15px monospace';
   ctx.textAlign = 'center';
   ctx.shadowBlur = 10;
-  
+
   ctx.fillStyle = CHECKER_CONFIG.cyan;
   ctx.shadowColor = CHECKER_CONFIG.cyan;
   ctx.fillText(getPipCount('cyan').toString(), barCenterX, 60);
-  
+
   ctx.fillStyle = '#ffffff';
   ctx.shadowColor = CHECKER_CONFIG.magenta;
   ctx.fillText(
@@ -1267,14 +1346,14 @@ function render() {
   ctx.restore();
 
   if (state.mode === 'match') {
-    const SCORE_CONFIG = { 
-      y1: 645,            
-      y2: 690,            
-      boxWidth: 24, 
-      boxHeight: 32, 
-      boxGap: 6 
+    const SCORE_CONFIG = {
+      y1: 645,
+      y2: 690,
+      boxWidth: 24,
+      boxHeight: 32,
+      boxGap: 6,
     };
-    
+
     ctx.save();
     ctx.font = 'bold 20px monospace';
     ctx.fillStyle = CHECKER_CONFIG.magenta;
@@ -1284,12 +1363,19 @@ function render() {
     ctx.textBaseline = 'middle';
     ctx.fillText('PINKY', 201, SCORE_CONFIG.y1);
     ctx.restore();
-    
+
     state.scores.magenta.forEach((val, idx) => {
       const boxX = 281 + idx * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
-      drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.magenta, val);
+      drawScoreBox(
+        boxX,
+        SCORE_CONFIG.y1 - 2,
+        SCORE_CONFIG.boxWidth,
+        SCORE_CONFIG.boxHeight,
+        CHECKER_CONFIG.magenta,
+        val
+      );
     });
-    
+
     ctx.save();
     ctx.font = 'bold 20px monospace';
     ctx.fillStyle = CHECKER_CONFIG.cyan;
@@ -1299,14 +1385,21 @@ function render() {
     ctx.textBaseline = 'middle';
     ctx.fillText('BRAIN', 606, SCORE_CONFIG.y1);
     ctx.restore();
-    
+
     state.scores.cyan.forEach((val, idx) => {
       const boxX = 442 + idx * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
-      drawScoreBox(boxX, SCORE_CONFIG.y1 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, val);
+      drawScoreBox(
+        boxX,
+        SCORE_CONFIG.y1 - 2,
+        SCORE_CONFIG.boxWidth,
+        SCORE_CONFIG.boxHeight,
+        CHECKER_CONFIG.cyan,
+        val
+      );
     });
 
-    const centerIq = 404; 
-    
+    const centerIq = 404;
+
     ctx.save();
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = '#ffffff';
@@ -1316,19 +1409,30 @@ function render() {
     ctx.textBaseline = 'middle';
     ctx.fillText('MATCH-SCORE', centerIq, SCORE_CONFIG.y2);
     ctx.restore();
-    
+
     const pinkyMatchX = 281;
-    drawScoreBox(pinkyMatchX, SCORE_CONFIG.y2 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.magenta, state.matchScores.magenta);
-    
+    drawScoreBox(
+      pinkyMatchX,
+      SCORE_CONFIG.y2 - 2,
+      SCORE_CONFIG.boxWidth,
+      SCORE_CONFIG.boxHeight,
+      CHECKER_CONFIG.magenta,
+      state.matchScores.magenta
+    );
+
     const brainMatchX = 442 + 2 * (SCORE_CONFIG.boxWidth + SCORE_CONFIG.boxGap);
-    drawScoreBox(brainMatchX, SCORE_CONFIG.y2 - 2, SCORE_CONFIG.boxWidth, SCORE_CONFIG.boxHeight, CHECKER_CONFIG.cyan, state.matchScores.cyan);
+    drawScoreBox(
+      brainMatchX,
+      SCORE_CONFIG.y2 - 2,
+      SCORE_CONFIG.boxWidth,
+      SCORE_CONFIG.boxHeight,
+      CHECKER_CONFIG.cyan,
+      state.matchScores.cyan
+    );
   }
 
   if (!state.gameEnded) {
-    if (
-      state.dice.length === 0 &&
-      !state.isProcessing
-    ) {
+    if (state.dice.length === 0 && !state.isProcessing) {
       const logX = barCenterX - 22;
       const baseLogY = boardMid + GRID.diceYOffset;
       const pulse = Math.sin(Date.now() * 0.007) * 5;
@@ -1337,23 +1441,23 @@ function render() {
         const y = baseLogY + i * 55;
         ctx.save();
         ctx.shadowBlur = 12 + pulse;
-        
+
         let outlineColor = CHECKER_CONFIG.magenta;
         if (state.isOpeningRoll) {
-          outlineColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
+          outlineColor = i === 0 ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
         } else if (state.currentPlayer === 'cyan') {
           outlineColor = CHECKER_CONFIG.cyan;
         }
-        
+
         ctx.shadowColor = outlineColor;
         ctx.strokeStyle = outlineColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
-        
+
         ctx.beginPath();
         ctx.roundRect(logX, y, 44, 44, 8);
         ctx.stroke();
-        
+
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fill();
 
@@ -1368,7 +1472,7 @@ function render() {
   } else {
     const x = barCenterX,
       y = boardMid + GRID.diceYOffset + 45;
-    
+
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     ctx.strokeStyle = '#fff';
@@ -1389,7 +1493,7 @@ function render() {
         btnWidth = 160;
       }
     }
-    
+
     ctx.roundRect(x - btnWidth / 2, y - 20, btnWidth, 40, 10);
     ctx.fill();
     ctx.stroke();
@@ -1408,14 +1512,14 @@ function render() {
     ctx.rotate((d.rotation * Math.PI) / 180);
     ctx.translate(-22, -22);
     ctx.globalAlpha = d.alpha;
-    
+
     ctx.shadowBlur = d.isRolling ? 25 : 15;
-    
+
     let diceColor = CHECKER_CONFIG[state.currentPlayer];
     if (state.isOpeningRoll || state.message.includes('BEGINNT')) {
-      diceColor = (i === 0) ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
+      diceColor = i === 0 ? CHECKER_CONFIG.cyan : CHECKER_CONFIG.magenta;
     }
-    
+
     ctx.shadowColor = diceColor;
     ctx.strokeStyle = diceColor;
     ctx.lineWidth = 2;
@@ -1428,8 +1532,11 @@ function render() {
     ctx.font = 'bold 26px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    
-    const valStr = d.displayValue !== undefined ? d.displayValue.toString() : d.value.toString();
+
+    const valStr =
+      d.displayValue !== undefined
+        ? d.displayValue.toString()
+        : d.value.toString();
     ctx.fillText(valStr, 22, 24);
     ctx.restore();
   });
@@ -1438,8 +1545,8 @@ function render() {
     ctx.save();
     let color = CHECKER_CONFIG[state.currentPlayer] || '#fff';
     if (state.isOpeningRoll && !state.message.includes('PASCH')) color = '#fff';
-    if (state.matchEnded) color = '#fff'; 
-    
+    if (state.matchEnded) color = '#fff';
+
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -1472,8 +1579,7 @@ function handleInteraction(clientX: number, clientY: number) {
     if (x >= mX - 260 && x <= mX - 20 && y >= mY - 20 && y <= mY + 35) {
       state.mode = 'single';
       resetGameForNextRound();
-    }
-    else if (x >= mX + 20 && x <= mX + 260 && y >= mY - 20 && y <= mY + 35) {
+    } else if (x >= mX + 20 && x <= mX + 260 && y >= mY - 20 && y <= mY + 35) {
       state.mode = 'match';
       resetGameForNextRound();
     }
@@ -1483,7 +1589,7 @@ function handleInteraction(clientX: number, clientY: number) {
   if (state.gameEnded) {
     const buttonX = barCenterX;
     const buttonY = boardMid + GRID.diceYOffset + 45;
-    
+
     let btnWidth = 140;
     if (state.mode === 'match') {
       btnWidth = state.matchEnded ? 200 : 160;
@@ -1513,7 +1619,7 @@ function handleInteraction(clientX: number, clientY: number) {
   ) {
     const r1 = Math.floor(Math.random() * 6) + 1,
       r2 = Math.floor(Math.random() * 6) + 1;
-    
+
     state.isProcessing = true;
 
     if (state.isOpeningRoll) {
@@ -1530,9 +1636,10 @@ function handleInteraction(clientX: number, clientY: number) {
         } else {
           state.isOpeningRoll = false;
           state.currentPlayer = r1 > r2 ? 'cyan' : 'magenta';
-          const winnerName = state.currentPlayer === 'magenta' ? 'PINKY' : 'BRAIN';
+          const winnerName =
+            state.currentPlayer === 'magenta' ? 'PINKY' : 'BRAIN';
           state.message = `${winnerName} BEGINNT!`;
-          
+
           setTimeout(() => {
             state.message = '';
             state.isProcessing = false;
@@ -1616,11 +1723,11 @@ function initAnimCheckers() {
 function resizeGame() {
   const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
   if (!canvas) return;
-  
+
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
   canvas.style.objectFit = 'fill';
-  
+
   window.scrollTo(0, 0);
 }
 
