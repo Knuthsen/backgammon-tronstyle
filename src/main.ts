@@ -704,11 +704,11 @@ function updateValidTargets() {
   });
 
   // 2. Kombinierte Double-Moves für Pinky (magenta) berechnen
-  // FIX: Block wird sofort ignoriert, wenn Pinky von der Bar zieht, dort aber MEHR ALS EIN Stein liegt!
+  // FIX: Doppelzüge sind komplett gesperrt, sobald mehr als 1 Stein auf der Bar liegt!
   if (
     state.currentPlayer === 'magenta' &&
     state.dice.length >= 2 &&
-    !(state.selectedPoint === 'bar' && state.bar.magenta > 1)
+    state.bar.magenta <= 1
   ) {
     let fromIdx =
       state.selectedPoint === 'bar' ? 24 : (state.selectedPoint as number);
