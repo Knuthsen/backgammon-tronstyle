@@ -540,7 +540,12 @@ function handleMove(to: number) {
         : (state.selectedPoint as number);
 
     // --- LOGIK FÜR ERWEITERTEN DOUBLE MOVE (PINKY / MAGENTA) ---
-    if (state.currentPlayer === 'magenta' && state.dice.length >= 2) {
+    // FIX: Ausführung des Doppelzugs blockieren, wenn mehr als 1 Stein auf der Bar gefangen ist!
+    if (
+      state.currentPlayer === 'magenta' &&
+      state.dice.length >= 2 &&
+      state.bar.magenta <= 1
+    ) {
       const d1 = state.dice[0];
       const d2 = state.dice[1];
       const totalDist = fromIdx - to;
