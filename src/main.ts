@@ -94,6 +94,7 @@ const state = {
     cyan: 0,
   },
   mode: 'menu' as 'menu' | 'single' | 'match',
+  isCoinInserted: false, // <--- NEU: Trackt den ersten Münzeinwurf
   matchEnded: false,
   currentGameNumber: { magenta: 0, cyan: 0 },
 };
@@ -1246,11 +1247,29 @@ function render() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    drawMenuGrid();
-    
     const mX = canvas.width / 2;
     const mY = canvas.height / 2;
 
+    // --- PHASE 1: INSERT COIN SCREEN ---
+    if (!state.isCoinInserted) {
+      // Dezentes Pulsieren für das echte Spielhallen-Feeling
+      const pulseGlow = 18 + Math.sin(Date.now() * 0.006) * 8;
+
+      ctx.save();
+      ctx.font = 'bold 44px monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.shadowBlur = pulseGlow;
+      ctx.shadowColor = '#00f2ff';
+      ctx.fillText('INSERT COIN', mX, mY - 110);
+      ctx.restore();
+
+      requestAnimationFrame(render);
+      return;
+    }
+
+    drawMenuGrid();
+    
     ctx.save();
     ctx.globalAlpha = menuAnimState.titleOpacity;
     ctx.font = 'bold 44px monospace';
@@ -1617,6 +1636,14 @@ function handleInteraction(clientX: number, clientY: number) {
     const mX = canvas.width / 2;
     const mY = canvas.height / 2;
 
+    // ERSTER KLICK: Münzeinwurf & Audio-Freischaltung
+    if (!state.isCoinInserted) {
+      state.isCoinInserted = true;
+      playSound('startup');
+      animateStartScreen();
+      return;
+    }
+    
     if (x >= mX - 260 && x <= mX - 20 && y >= mY - 20 && y <= mY + 35) {
       state.mode = 'single';
       resetGameForNextRound();
@@ -1781,7 +1808,7 @@ boardImg.onload = () => {
   resizeGame();
   initAnimCheckers();
   render();
-  animateStartScreen();
+  // animateStartScreen();
 };
 
 boardImg.onerror = (err) => {
