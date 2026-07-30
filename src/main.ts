@@ -13,7 +13,7 @@ const SOUNDS = {
 };
 
 // --- LAUTSTÄRKEN ANPASSEN (0.0 bis 1.0) ---
-SOUNDS.hit.volume = 0.2; // Halb so laut (50%)
+SOUNDS.hit.volume = 0.1; // Halb so laut (50%)
 SOUNDS.win.volume = 0.3; // Halb so laut (50%)
 
 function playSound(soundKey: keyof typeof SOUNDS) {
