@@ -3,6 +3,33 @@ import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm';
 
 import './style.css';
 
+// --- SOUND MANAGER ---
+const SOUNDS = {
+  startup: new Audio('/sound-startup.m4a'),
+  hit: new Audio('/sound-hit1.m4a'),
+  pasch: new Audio('/sound-pasch.m4a'),
+  nomove: new Audio('/sound-nomove.m4a'),
+  win: new Audio('/sound-gewonnen1.m4a'),
+};
+
+// --- LAUTSTÄRKEN ANPASSEN (0.0 bis 1.0) ---
+SOUNDS.hit.volume = 0.5; // Halb so laut (50%)
+SOUNDS.win.volume = 0.5; // Halb so laut (50%)
+
+function playSound(soundKey: keyof typeof SOUNDS) {
+  try {
+    const audio = SOUNDS[soundKey];
+    if (audio) {
+      audio.currentTime = 0; // Setzt den Sound zurück, falls er schnell hintereinander feuert
+      audio.play().catch(() => {
+        // Fängt eventuelle Autoplay-Sperren des Browsers ab
+      });
+    }
+  } catch (e) {
+    console.warn('Audio konnte nicht abgespielt werden:', e);
+  }
+}
+
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
@@ -142,6 +169,8 @@ function animateStartScreen() {
     },
     0
   );
+
+  tl.call(() => playSound('startup'), [], 0.2); // Führt den Sound exakt bei Sekunde 0.2 der Timeline aus
 
   tl.to(
     menuAnimState,
@@ -302,6 +331,7 @@ function animateCheckerMove(
 
   let tx, ty;
   if (to === 'bar') {
+    playSound('hit'); // <--- NEU (spielt direkt ab, wenn die Partikel explodieren!)
     const pos = getLogPosForBar(player, state.bar[player]);
     tx = pos.x;
     ty = pos.y;
@@ -461,6 +491,7 @@ function executeBearOff(from: number, die: number) {
   state.doubleMoveTarget = null;
 
   if (state.off[p] === 15) {
+    playSound('win'); // <--- NEU
     const winnerName = p === 'magenta' ? 'PINKY' : 'BRAIN';
     const loserKey = p === 'magenta' ? 'cyan' : 'magenta';
     let points = 1;
@@ -784,7 +815,11 @@ function checkGameState() {
           state.dice.some((d) => canMove(i, d) || canMoveToOff(i, d))
       );
 
-  if (!possible) {
+      if (!possible) {
+        // Spielt den 'nomove'-Sound nur ab, wenn es KEIN komplett blockierter Pasch ist (4 Würfel noch da)
+        if (state.dice.length !== 4) {
+          playSound('nomove');
+        }
     state.message = 'KEIN ZUG MÖGLICH';
     setTimeout(() => {
       state.dice = [];
@@ -1036,7 +1071,8 @@ async function playAiTurn() {
     await delay(800);
     const r1 = Math.floor(Math.random() * 6) + 1,
       r2 = Math.floor(Math.random() * 6) + 1;
-    state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
+      if (r1 === r2) playSound('pasch'); // <--- NEU
+      state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
     animateDiceShake();
     await delay(1200);
   } else {
@@ -1211,7 +1247,7 @@ function render() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     drawMenuGrid();
-
+    
     const mX = canvas.width / 2;
     const mY = canvas.height / 2;
 
@@ -1631,6 +1667,7 @@ function handleInteraction(clientX: number, clientY: number) {
       state.dice = [r1, r2];
       animateDiceShake(() => {
         if (r1 === r2) {
+          playSound('pasch'); // <--- NEU
           state.message = 'PASCH! ERNEUT WÜRFELN';
           setTimeout(() => {
             state.dice = [];
@@ -1658,6 +1695,7 @@ function handleInteraction(clientX: number, clientY: number) {
       });
     } else {
       if (state.currentPlayer === 'cyan') return;
+      if (r1 === r2) playSound('pasch'); // <--- NEU
       state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
       animateDiceShake(() => {
         state.isProcessing = false;
