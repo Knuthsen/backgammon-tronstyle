@@ -3,23 +3,50 @@ import { gsap } from 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/+esm';
 
 import './style.css';
 
-// --- SOUND MANAGER ---
-const SOUNDS = {
-  startup: new Audio('/sound-startup.m4a'),
-  hit: new Audio('/sound-hit1.m4a'),
-  nomove: new Audio('/sound-nomove.m4a'),
-  win: new Audio('/sound-gewonnen1.m4a'),
+// --- SMART SOUND MANAGER (Web Audio API - Kein Notch-Symbol mehr) ---
+const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+const SOUND_CONFIG: Record<string, { url: string; volume: number }> = {
+  startup: { url: '/sound-startup.m4a', volume: 1.0 },
+  hit: { url: '/sound-hit1.m4a', volume: 0.2 },
+  nomove: { url: '/sound-nomove.m4a', volume: 1.0 },
+  win: { url: '/sound-gewonnen1.m4a', volume: 0.3 },
 };
 
-function playSound(soundKey: keyof typeof SOUNDS) {
+// Speicher für die vorgeladenen Audio-Puffer
+const audioBuffers: Record<string, AudioBuffer> = {};
+
+// Alle Audio-Dateien im Hintergrund in den Speicher laden
+Object.entries(SOUND_CONFIG).forEach(([key, cfg]) => {
+  fetch(cfg.url)
+    .then((res) => res.arrayBuffer())
+    .then((data) => audioCtx.decodeAudioData(data))
+    .then((buffer) => {
+      audioBuffers[key] = buffer;
+    })
+    .catch((e) => console.warn(`Fehler beim Laden von Sound ${key}:`, e));
+});
+
+function playSound(soundKey: keyof typeof SOUND_CONFIG) {
   try {
-    const audio = SOUNDS[soundKey];
-    if (audio) {
-      audio.currentTime = 0; // Setzt den Sound zurück, falls er schnell hintereinander feuert
-      audio.play().catch(() => {
-        // Fängt eventuelle Autoplay-Sperren des Browsers ab
-      });
+    // AudioContext aufwecken, falls iOS ihn pausiert hat
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
     }
+
+    const buffer = audioBuffers[soundKey];
+    if (!buffer) return;
+
+    const source = audioCtx.createBufferSource();
+    const gainNode = audioCtx.createGain();
+
+    source.buffer = buffer;
+    gainNode.gain.value = SOUND_CONFIG[soundKey].volume;
+
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    source.start(0);
   } catch (e) {
     console.warn('Audio konnte nicht abgespielt werden:', e);
   }
