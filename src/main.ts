@@ -7,7 +7,6 @@ import './style.css';
 const SOUNDS = {
   startup: new Audio('/sound-startup.m4a'),
   hit: new Audio('/sound-hit1.m4a'),
-  pasch: new Audio('/sound-pasch.m4a'),
   nomove: new Audio('/sound-nomove.m4a'),
   win: new Audio('/sound-gewonnen1.m4a'),
 };
@@ -813,10 +812,8 @@ function checkGameState() {
       );
 
       if (!possible) {
-        // Spielt den 'nomove'-Sound nur ab, wenn es KEIN komplett blockierter Pasch ist (4 Würfel noch da)
-        if (state.dice.length !== 4) {
+        // Spielt den 'nomove'-Sound 
           playSound('nomove');
-        }
     state.message = 'KEIN ZUG MÖGLICH';
     setTimeout(() => {
       state.dice = [];
@@ -1068,7 +1065,6 @@ async function playAiTurn() {
     await delay(800);
     const r1 = Math.floor(Math.random() * 6) + 1,
       r2 = Math.floor(Math.random() * 6) + 1;
-      if (r1 === r2) playSound('pasch'); // <--- NEU
       state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
     animateDiceShake();
     await delay(1200);
@@ -1690,7 +1686,6 @@ function handleInteraction(clientX: number, clientY: number) {
       state.dice = [r1, r2];
       animateDiceShake(() => {
         if (r1 === r2) {
-          playSound('pasch'); // <--- NEU
           state.message = 'PASCH! ERNEUT WÜRFELN';
           setTimeout(() => {
             state.dice = [];
@@ -1718,7 +1713,6 @@ function handleInteraction(clientX: number, clientY: number) {
       });
     } else {
       if (state.currentPlayer === 'cyan') return;
-      if (r1 === r2) playSound('pasch'); // <--- NEU
       state.dice = r1 === r2 ? [r1, r1, r1, r1] : [r1, r2];
       animateDiceShake(() => {
         state.isProcessing = false;
