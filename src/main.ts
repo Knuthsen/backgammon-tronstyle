@@ -9,7 +9,6 @@ const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)
 const SOUND_CONFIG: Record<string, { url: string; volume: number }> = {
   startup: { url: '/sound-startup.m4a', volume: 1.0 },
   hit: { url: '/sound-hit1.m4a', volume: 0.2 },
-  nomove: { url: '/sound-nomove.m4a', volume: 1.0 },
   win: { url: '/sound-gewonnen1.m4a', volume: 0.3 },
 };
 
@@ -839,8 +838,6 @@ function checkGameState() {
       );
 
       if (!possible) {
-        // Spielt den 'nomove'-Sound 
-          playSound('nomove');
     state.message = 'KEIN ZUG MÖGLICH';
     setTimeout(() => {
       state.dice = [];
